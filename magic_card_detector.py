@@ -151,8 +151,8 @@ def simplify_polygon(in_poly, tol=0.05, maxiter=None, segment_to_remove=None):
     if segment_to_remove is not None:
         maxiter = 1
     while len_poly > 4:
-        d_in = np.sqrt(np.ediff1d(x_in, to_end=x_in[0]-x_in[-1]) ** 2.
-                       + np.ediff1d(y_in, to_end=y_in[0]-y_in[-1]) ** 2.)
+        d_in = np.sqrt(np.ediff1d(x_in, to_end=x_in[0]-x_in[-1]) ** 2. +
+                       np.ediff1d(y_in, to_end=y_in[0]-y_in[-1]) ** 2.)
         d_tot = np.sum(d_in)
         if segment_to_remove is not None:
             k = segment_to_remove
@@ -349,6 +349,37 @@ def polygon_form_factor(poly):
                                          axis=0) ** 2., axis=1)))
     return poly.area/(poly.length * d_0)
 
+
+def characterize_card_contour(card_contour,
+                              max_segment_area,
+                              image_area):
+    """
+    Calculates a bounding polygon for a contour, in addition
+    to several charasteristic parameters.
+    """
+    continue_segmentation = True
+    is_card_candidate = False
+    phull = convex_hull_polygon(card_contour)
+    bounding_poly = get_bounding_quad(phull)
+
+    qc_diff = quad_corner_diff(phull, bounding_poly)
+    crop_factor = min(1., (1. - qc_diff * 22. / 100.))
+    if (bounding_poly.area < 0.7 * max_segment_area or
+            bounding_poly.area < image_area / 1000.):
+        # break after card size range has been explored
+        continue_segmentation = False
+
+    if (0.7 * max_segment_area < bounding_poly.area <
+            image_area * 0.99 and
+            qc_diff < 0.35 and
+            0.27 < polygon_form_factor(bounding_poly) < 0.32):
+        is_card_candidate = True
+
+    return (continue_segmentation,
+            is_card_candidate,
+            bounding_poly,
+            crop_factor)
+
 #
 # CLASSES
 #
@@ -364,6 +395,7 @@ class CardCandidate:
         self.contour = card_cnt
         self.bounding_quad = bquad
         self.is_recognized = False
+        self.recognition_score = 0.
         self.is_fragment = False
         self.image_area_fraction = fraction
         self.name = 'unknown'
@@ -438,6 +470,39 @@ class TestImage:
         limg = cv2.merge((corrected_lightness, redness, yellowness))
         self.adjusted = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
 
+    def mark_fragments(self):
+        """
+        Finds doubly (or multiply) segmented cards and marks all but one
+        as a fragment (that is, an unnecessary duplicate)
+        """
+        for (candidate, other_candidate) in product(self.candidate_list,
+                                                    repeat=2):
+            if ((candidate.is_recognized or other_candidate.is_recognized) and
+                    candidate != other_candidate):
+                i_area = candidate.bounding_quad.intersection(
+                    other_candidate.bounding_quad).area
+                min_area = min(candidate.bounding_quad.area,
+                               other_candidate.bounding_quad.area)
+                if i_area > 0.5 * min_area:
+                    if (candidate.is_recognized and
+                            other_candidate.is_recognized):
+                        #if (candidate.bounding_quad.area <
+                        #        other_candidate.bounding_quad.area):
+                        if (candidate.recognition_score <
+                                other_candidate.recognition_score):
+                            candidate.is_fragment = True
+                            #other_candidate.is_fragment = False
+                        else:
+                            #candidate.is_fragment = False
+                            other_candidate.is_fragment = True
+                    else:
+                        if candidate.is_recognized:
+                            #candidate.is_fragment = False
+                            other_candidate.is_fragment = True
+                        else:
+                            candidate.is_fragment = True
+                            #other_candidate.is_fragment = False
+
     def plot_image_with_recognized(self):
         """
         Plots the recognized cards into the full image.
@@ -482,25 +547,14 @@ class MTGCardDetector:
     """
 
     def __init__(self):
-        #self.ref_img_clahe = []
-        #self.ref_filenames = []
-        #self.test_img_clahe = []
-        #self.test_filenames = []
-        #self.warped_list = []
-        #self.card_list = []
-        #self.bounding_poly_list = []
-
         self.reference_images = []
         self.test_images = []
-        #self.candidate_list = []
-
-        #self.phash_ref = []
 
         self.verbose = False
         self.visual = True
 
         self.hash_separation_thr = 4.
-        self.thr_lvl = 70
+        self.thr_lvl = 90
 
         self.clahe = cv2.createCLAHE(clipLimit=2.0,
                                      tileGridSize=(8, 8))
@@ -530,6 +584,51 @@ class MTGCardDetector:
             self.test_images.append(
                 TestImage(img_name, img, self.clahe))
 
+    def contour_image(self, full_image):
+        """
+        Grayscale transform, thresholding, countouring and sorting by area.
+        """
+        gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray, self.thr_lvl, 255, cv2.THRESH_BINARY)
+        _, contours, _ = cv2.findContours(
+            np.uint8(thresh), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours_sorted = sorted(contours, key=cv2.contourArea, reverse=True)
+        return contours_sorted
+
+    def contour_image_rgb(self, full_image):
+        """
+        Grayscale transform, thresholding, countouring and sorting by area.
+        """
+        gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
+        blue, green, red = cv2.split(full_image)
+        _, thresh = cv2.threshold(gray, self.thr_lvl, 255, cv2.THRESH_BINARY)
+        _, thr_b = cv2.threshold(blue, 90, 255, cv2.THRESH_BINARY)
+        _, thr_g = cv2.threshold(green, 90, 255, cv2.THRESH_BINARY)
+        _, thr_r = cv2.threshold(red, 90, 255, cv2.THRESH_BINARY)
+        _, contours_gray, _ = cv2.findContours(
+            np.uint8(thresh), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours_b, _ = cv2.findContours(
+            np.uint8(thr_b), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours_g, _ = cv2.findContours(
+            np.uint8(thr_g), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        _, contours_r, _ = cv2.findContours(
+            np.uint8(thr_r), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours = contours_gray + contours_b + contours_g + contours_r
+        contours_sorted = sorted(contours, key=cv2.contourArea, reverse=True)
+        return contours_sorted
+
+    def contour_image_canny(self, full_image):
+        """
+        Grayscale and RGB transform, thresholding, countouring and sorting.
+        """
+        gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
+        gray = cv2.bilateralFilter(gray, 5, 11, 11)
+        edges = cv2.Canny(gray, 50, 100)
+        _, contours, _ = cv2.findContours(
+            np.uint8(edges), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours_sorted = sorted(contours, key=cv2.contourArea, reverse=True)
+        return contours_sorted
+
     def segment_image(self, test_image):
         """
         Segments the given image into card candidates, that is,
@@ -538,35 +637,27 @@ class MTGCardDetector:
         """
         full_image = test_image.adjusted.copy()
         image_area = full_image.shape[0] * full_image.shape[1]
-        lca = 0.01  # largest card area
+        max_segment_area = 0.01  # largest card area
 
-        # grayscale transform, thresholding, countouring and sorting by area
-        gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, self.thr_lvl, 255, cv2.THRESH_BINARY)
-        _, contours, _ = cv2.findContours(
-            np.uint8(thresh), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)
+        # contours = self.contour_image(full_image)
+        contours = self.contour_image_rgb(full_image)
 
         for card_contour in contours:
-            phull = convex_hull_polygon(card_contour)
-            if phull.area < 0.7 * lca or phull.area < image_area / 1000.:
-                # break after card size range has been explored
+            (continue_segmentation,
+             is_card_candidate,
+             bounding_poly,
+             crop_factor) = characterize_card_contour(
+                 card_contour, max_segment_area, image_area)
+            if not continue_segmentation:
                 break
-            bounding_poly = get_bounding_quad(phull)
-
-            qc_diff = quad_corner_diff(phull, bounding_poly)
-            scale_factor = min(1., (1. - qc_diff * 22. / 100.))
-            warped = four_point_transform(full_image,
-                                          scale(bounding_poly,
-                                                xfact=scale_factor,
-                                                yfact=scale_factor,
-                                                origin='centroid'))
-
-            if (0.7 * lca < bounding_poly.area < image_area * 0.99 and
-                    qc_diff < 0.35 and
-                    0.27 < polygon_form_factor(bounding_poly) < 0.32):
-                if lca == 0.01:
-                    lca = bounding_poly.area
+            if is_card_candidate:
+                if max_segment_area == 0.01:
+                    max_segment_area = bounding_poly.area
+                warped = four_point_transform(full_image,
+                                              scale(bounding_poly,
+                                                    xfact=crop_factor,
+                                                    yfact=crop_factor,
+                                                    origin='centroid'))
                 test_image.candidate_list.append(
                     CardCandidate(warped,
                                   card_contour,
@@ -584,6 +675,7 @@ class MTGCardDetector:
 
         card_name = 'unknown'
         is_recognized = False
+        recognition_score = 0.
         rotations = np.array([0., 90., 180., 270.])
 
         d_0_dist = np.zeros(len(rotations))
@@ -605,8 +697,9 @@ class MTGCardDetector:
                 card_name = self.reference_images[np.argmin(d_0[:, j])]\
                             .name.split('.jpg')[0]
                 is_recognized = True
+                recognition_score = d_0_dist[j] / self.hash_separation_thr
                 break
-        return (is_recognized, card_name)
+        return (is_recognized, recognition_score, card_name)
 
     def recognize_segment(self, image_segment):
         """
@@ -647,6 +740,7 @@ class MTGCardDetector:
             print(str(iseg) + " / " +
                   str(len(test_image.candidate_list)))
 
+            # Easy fragment / duplicate detection
             for other_candidate in test_image.candidate_list:
                 if (other_candidate.is_recognized and
                         not other_candidate.is_fragment):
@@ -654,8 +748,10 @@ class MTGCardDetector:
                         candidate.is_fragment = True
             if not candidate.is_fragment:
                 (candidate.is_recognized,
+                 candidate.recognition_score,
                  candidate.name) = self.recognize_segment(im_seg)
-
+        # Final fragment detection
+        test_image.mark_fragments()
         test_image.plot_image_with_recognized()
 
 
@@ -679,7 +775,7 @@ def main():
     profiler.enable()
 
     # Run the card detection and recognition.
-    for im_ind in range(1, 4):
+    for im_ind in range(0, 4):
         card_detector.run_recognition(im_ind)
 
     # Stop profiling and organize and print profiling results.
