@@ -376,211 +376,81 @@ class CardCandidate:
         return other.bounding_quad.within(self.bounding_quad)
 
 
-class MTGCardDetector:
+class ReferenceImage:
     """
-    MTG card detector class.
+    Container for a card image and the associated recoginition data.
     """
 
-    def __init__(self):
-        self.ref_img_clahe = []
-        self.ref_filenames = []
-        self.test_img_clahe = []
-        self.test_filenames = []
-        self.warped_list = []
-        self.card_list = []
-        self.bounding_poly_list = []
+    def __init__(self, name, original_image, clahe):
+        self.name = name
+        self.original = original_image
+        self.clahe = clahe
+        self.adjusted = None
+        self.phash = None
+
+        self.histogram_adjust()
+        self.calculate_phash()
+
+    def calculate_phash(self):
+        """
+        Calculates the perceptive hash for the image
+        """
+        self.phash = imagehash.phash(
+                        PILImage.fromarray(np.uint8(255 * cv2.cvtColor(
+                            self.adjusted, cv2.COLOR_BGR2RGB))),
+                        hash_size=32)
+
+    def histogram_adjust(self):
+        """
+        Adjusts the image by contrast limited histogram adjustmend (clahe)
+        """
+        lab = cv2.cvtColor(self.original, cv2.COLOR_BGR2LAB)
+        lightness, redness, yellowness = cv2.split(lab)
+        corrected_lightness = self.clahe.apply(lightness)
+        limg = cv2.merge((corrected_lightness, redness, yellowness))
+        self.adjusted = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
+
+
+class TestImage:
+    """
+    Container for a card image and the associated recoginition data.
+    """
+
+    def __init__(self, name, original_image, clahe):
+        self.name = name
+        self.original = original_image
+        self.clahe = clahe
+        self.adjusted = None
+        self.phash = None
+        self.visual = True
+        self.histogram_adjust()
+        # self.calculate_phash()
 
         self.candidate_list = []
 
-        self.phash_ref = []
-
-        self.verbose = False
-        self.visual = True
-
-        self.hash_separation_thr = 4.
-        self.thr_lvl = 70
-
-        self.clahe_clip_limit = 2.0
-        self.clahe_tile_grid_size = (8, 8)
-
-    def read_and_adjust_images(self, path):
+    def histogram_adjust(self):
         """
-        Reads image files and performs adaptive histogram equalization.
+        Adjusts the image by contrast limited histogram adjustmend (clahe)
         """
+        lab = cv2.cvtColor(self.original, cv2.COLOR_BGR2LAB)
+        lightness, redness, yellowness = cv2.split(lab)
+        corrected_lightness = self.clahe.apply(lightness)
+        limg = cv2.merge((corrected_lightness, redness, yellowness))
+        self.adjusted = cv2.cvtColor(limg, cv2.COLOR_LAB2BGR)
 
-        print('Reading images from ' + str(path))
-        filenames = glob.glob(path + '*.jpg')
-        imgs = []
-        img_names = []
-        imgs_clahe = []
-        clahe = cv2.createCLAHE(clipLimit=self.clahe_clip_limit,
-                                tileGridSize=self.clahe_tile_grid_size)
-
-        for file_name in filenames:
-            imgs.append(cv2.imread(file_name))
-            img_names.append(file_name.split(path)[1])
-
-        for img in imgs:
-            lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-            lightness, redness, yellowness = cv2.split(lab)
-            corrected_lightness = clahe.apply(lightness)
-            img = cv2.merge((corrected_lightness, redness, yellowness))
-            imgs_clahe.append(cv2.cvtColor(img, cv2.COLOR_LAB2BGR))
-
-        return (imgs_clahe, img_names)
-
-    def read_and_adjust_reference_images(self, path):
+    def plot_image_with_recognized(self):
         """
-        Reads and histogram-adjusts the reference image set.
-        Pre-calculates the hashes of the images.
+        Plots the recognized cards into the full image.
         """
-
-        (self.ref_img_clahe,
-         self.ref_filenames) = self.read_and_adjust_images(path)
-        print('Hashing reference set.')
-        for i in range(len(self.ref_img_clahe)):
-            self.phash_ref.append(
-                imagehash.phash(
-                    PILImage.fromarray(np.uint8(255 * cv2.cvtColor(
-                        self.ref_img_clahe[i], cv2.COLOR_BGR2RGB))),
-                    hash_size=32))
-
-    def read_and_adjust_test_images(self, path):
-        """
-        Reads and histogram-adjusts the reference image set.
-        """
-        (self.test_img_clahe,
-         self.test_filenames) = self.read_and_adjust_images(path)
-
-    def segment_image(self, full_image):
-        """
-        Segments the given image into card candidates, that is,
-        regions of the image that have a high chance
-        of containing a recognizable card.
-        """
-        self.candidate_list.clear()
-
-        image_area = full_image.shape[0] * full_image.shape[1]
-        lca = 0.01  # largest card area
-
-        # grayscale transform, thresholding, countouring and sorting by area
-        gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, self.thr_lvl, 255, cv2.THRESH_BINARY)
-        _, contours, _ = cv2.findContours(
-            np.uint8(thresh), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        contours = sorted(contours, key=cv2.contourArea, reverse=True)
-
-        for card_contour in contours:
-            phull = convex_hull_polygon(card_contour)
-            if phull.area < 0.7 * lca:
-                # break after card size range has been explored
-                break
-            bounding_poly = get_bounding_quad(phull)
-
-            qc_diff = quad_corner_diff(phull, bounding_poly)
-            scale_factor = min(1., (1. - qc_diff * 22. / 100.))
-            warped = four_point_transform(full_image,
-                                          scale(bounding_poly,
-                                                xfact=scale_factor,
-                                                yfact=scale_factor,
-                                                origin='centroid'))
-
-            if (0.7 * lca < bounding_poly.area < image_area * 0.99 and
-                    qc_diff < 0.35 and
-                    0.27 < polygon_form_factor(bounding_poly) < 0.32):
-                if lca == 0.01:
-                    lca = bounding_poly.area
-                self.candidate_list.append(
-                    CardCandidate(warped,
-                                  card_contour,
-                                  bounding_poly,
-                                  bounding_poly.area / image_area))
-                print(str(len(self.candidate_list)) + ' cards segmented.')
-
-    def phash_compare(self, im_seg):
-        """
-        Runs perceptive hash comparison between given image and
-        the (pre-hashed) reference set.
-        """
-
-        card_name = 'unknown'
-        is_recognized = False
-        rotations = np.array([0., 90., 180., 270.])
-
-        d_0_dist = np.zeros(len(rotations))
-        d_0 = np.zeros((len(self.ref_img_clahe), len(rotations)))
-        for j, rot in enumerate(rotations):
-            phash_im = imagehash.phash(PILImage.fromarray(
-                np.uint8(255 * cv2.cvtColor(rotate(im_seg, rot),
-                                            cv2.COLOR_BGR2RGB))), hash_size=32)
-            for i in range(len(d_0)):
-                d_0[i, j] = phash_im - self.phash_ref[i]
-            d_0_ = d_0[:, j][d_0[:, j] > np.amin(d_0[:, j])]
-            d_0_ave = np.average(d_0_)
-            d_0_std = np.std(d_0_)
-            d_0_dist[j] = (d_0_ave - np.amin(d_0[:, j]))/d_0_std
-            if self.verbose:
-                print('Phash statistical distance' + str(d_0_dist[j]))
-            if (d_0_dist[j] > self.hash_separation_thr and
-                    np.argmax(d_0_dist) == j):
-                card_name = self.ref_filenames[np.argmin(d_0[:, j])]\
-                            .split('.jpg')[0]
-                is_recognized = True
-                break
-        return (is_recognized, card_name)
-
-    def recognize_segment(self, image_segment):
-        """
-        Wrapper for different segmented image recognition algorithms.
-        """
-        return self.phash_compare(image_segment)
-
-    def run_recognition(self, image_index):
-        """
-        Tries to recognize cards from the image specified.
-        The image has been read in and adjusted previously,
-        and is contained in the internal data list of the class.
-        """
-
-        full_image = self.test_img_clahe[image_index].copy()
-
-        if self.visual:
-            print('Original image')
-            plt.imshow(cv2.cvtColor(self.test_img_clahe[image_index],
-                                    cv2.COLOR_BGR2RGB))
-            plt.show()
-
-        print('Segmentation of art')
-        self.segment_image(full_image)
-
-        if self.visual:
-            plt.show()
-
-        print('Recognition')
-
-        iseg = 0
-        plt.imshow(cv2.cvtColor(full_image, cv2.COLOR_BGR2RGB))
-        plt.axis('off')
-
+        # Plotting
         for candidate in self.candidate_list:
-            im_seg = candidate.image
-            bquad = candidate.bounding_quad
-
-            iseg += 1
-            print(str(iseg) + " / " + str(len(self.candidate_list)))
-
-            for other_candidate in self.candidate_list:
-                if (other_candidate.is_recognized and
-                        not other_candidate.is_fragment):
-                    if other_candidate.contains(candidate):
-                        candidate.is_fragment = True
             if not candidate.is_fragment:
+                full_image = self.adjusted
                 bquad_corners = np.empty((4, 2))
-                bquad_corners[:, 0] = np.asarray(bquad.exterior.coords)[:-1, 0]
-                bquad_corners[:, 1] = np.asarray(bquad.exterior.coords)[:-1, 1]
-
-                (candidate.is_recognized,
-                 candidate.name) = self.recognize_segment(im_seg)
+                bquad_corners[:, 0] = np.asarray(
+                    candidate.bounding_quad.exterior.coords)[:-1, 0]
+                bquad_corners[:, 1] = np.asarray(
+                    candidate.bounding_quad.exterior.coords)[:-1, 1]
 
                 plt.plot(np.append(bquad_corners[:, 0],
                                    bquad_corners[0, 0]),
@@ -600,10 +470,193 @@ class MTGCardDetector:
                                    alpha=0.7))
 
         plt.savefig('results/MTG_card_recognition_results_' +
-                    str(self.test_filenames[image_index].split('.jpg')[0]) +
+                    str(self.name.split('.jpg')[0]) +
                     '.jpg', dpi=600, bbox='tight')
         if self.visual:
             plt.show()
+
+
+class MTGCardDetector:
+    """
+    MTG card detector class.
+    """
+
+    def __init__(self):
+        #self.ref_img_clahe = []
+        #self.ref_filenames = []
+        #self.test_img_clahe = []
+        #self.test_filenames = []
+        #self.warped_list = []
+        #self.card_list = []
+        #self.bounding_poly_list = []
+
+        self.reference_images = []
+        self.test_images = []
+        #self.candidate_list = []
+
+        #self.phash_ref = []
+
+        self.verbose = False
+        self.visual = True
+
+        self.hash_separation_thr = 4.
+        self.thr_lvl = 70
+
+        self.clahe = cv2.createCLAHE(clipLimit=2.0,
+                                     tileGridSize=(8, 8))
+
+    def read_and_adjust_reference_images(self, path):
+        """
+        Reads and histogram-adjusts the reference image set.
+        Pre-calculates the hashes of the images.
+        """
+        print('Reading images from ' + str(path))
+        filenames = glob.glob(path + '*.jpg')
+        for filename in filenames:
+            img = cv2.imread(filename)
+            img_name = filename.split(path)[1]
+            self.reference_images.append(
+                ReferenceImage(img_name, img, self.clahe))
+
+    def read_and_adjust_test_images(self, path):
+        """
+        Reads and histogram-adjusts the test image set.
+        """
+        print('Reading images from ' + str(path))
+        filenames = glob.glob(path + '*.jpg')
+        for filename in filenames:
+            img = cv2.imread(filename)
+            img_name = filename.split(path)[1]
+            self.test_images.append(
+                TestImage(img_name, img, self.clahe))
+
+    def segment_image(self, test_image):
+        """
+        Segments the given image into card candidates, that is,
+        regions of the image that have a high chance
+        of containing a recognizable card.
+        """
+        full_image = test_image.adjusted.copy()
+        image_area = full_image.shape[0] * full_image.shape[1]
+        lca = 0.01  # largest card area
+
+        # grayscale transform, thresholding, countouring and sorting by area
+        gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
+        _, thresh = cv2.threshold(gray, self.thr_lvl, 255, cv2.THRESH_BINARY)
+        _, contours, _ = cv2.findContours(
+            np.uint8(thresh), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours = sorted(contours, key=cv2.contourArea, reverse=True)
+
+        for card_contour in contours:
+            phull = convex_hull_polygon(card_contour)
+            if phull.area < 0.7 * lca or phull.area < image_area / 1000.:
+                # break after card size range has been explored
+                break
+            bounding_poly = get_bounding_quad(phull)
+
+            qc_diff = quad_corner_diff(phull, bounding_poly)
+            scale_factor = min(1., (1. - qc_diff * 22. / 100.))
+            warped = four_point_transform(full_image,
+                                          scale(bounding_poly,
+                                                xfact=scale_factor,
+                                                yfact=scale_factor,
+                                                origin='centroid'))
+
+            if (0.7 * lca < bounding_poly.area < image_area * 0.99 and
+                    qc_diff < 0.35 and
+                    0.27 < polygon_form_factor(bounding_poly) < 0.32):
+                if lca == 0.01:
+                    lca = bounding_poly.area
+                test_image.candidate_list.append(
+                    CardCandidate(warped,
+                                  card_contour,
+                                  bounding_poly,
+                                  bounding_poly.area / image_area))
+                print('Segmented ' +
+                      str(len(test_image.candidate_list)) +
+                      ' candidates.')
+
+    def phash_compare(self, im_seg):
+        """
+        Runs perceptive hash comparison between given image and
+        the (pre-hashed) reference set.
+        """
+
+        card_name = 'unknown'
+        is_recognized = False
+        rotations = np.array([0., 90., 180., 270.])
+
+        d_0_dist = np.zeros(len(rotations))
+        d_0 = np.zeros((len(self.reference_images), len(rotations)))
+        for j, rot in enumerate(rotations):
+            phash_im = imagehash.phash(PILImage.fromarray(
+                np.uint8(255 * cv2.cvtColor(rotate(im_seg, rot),
+                                            cv2.COLOR_BGR2RGB))), hash_size=32)
+            for i in range(len(d_0)):
+                d_0[i, j] = phash_im - self.reference_images[i].phash
+            d_0_ = d_0[:, j][d_0[:, j] > np.amin(d_0[:, j])]
+            d_0_ave = np.average(d_0_)
+            d_0_std = np.std(d_0_)
+            d_0_dist[j] = (d_0_ave - np.amin(d_0[:, j]))/d_0_std
+            if self.verbose:
+                print('Phash statistical distance' + str(d_0_dist[j]))
+            if (d_0_dist[j] > self.hash_separation_thr and
+                    np.argmax(d_0_dist) == j):
+                card_name = self.reference_images[np.argmin(d_0[:, j])]\
+                            .name.split('.jpg')[0]
+                is_recognized = True
+                break
+        return (is_recognized, card_name)
+
+    def recognize_segment(self, image_segment):
+        """
+        Wrapper for different segmented image recognition algorithms.
+        """
+        return self.phash_compare(image_segment)
+
+    def run_recognition(self, image_index):
+        """
+        Tries to recognize cards from the image specified.
+        The image has been read in and adjusted previously,
+        and is contained in the internal data list of the class.
+        """
+
+        test_image = self.test_images[image_index]
+
+        if self.visual:
+            print('Original image')
+            plt.imshow(cv2.cvtColor(test_image.original,
+                                    cv2.COLOR_BGR2RGB))
+            plt.show()
+
+        print('Segmentation of art')
+
+        test_image.candidate_list.clear()
+        self.segment_image(test_image)
+
+        print('Recognition')
+
+        iseg = 0
+        plt.imshow(cv2.cvtColor(test_image.original, cv2.COLOR_BGR2RGB))
+        plt.axis('off')
+
+        for candidate in test_image.candidate_list:
+            im_seg = candidate.image
+
+            iseg += 1
+            print(str(iseg) + " / " +
+                  str(len(test_image.candidate_list)))
+
+            for other_candidate in test_image.candidate_list:
+                if (other_candidate.is_recognized and
+                        not other_candidate.is_fragment):
+                    if other_candidate.contains(candidate):
+                        candidate.is_fragment = True
+            if not candidate.is_fragment:
+                (candidate.is_recognized,
+                 candidate.name) = self.recognize_segment(im_seg)
+
+        test_image.plot_image_with_recognized()
 
 
 def main():
@@ -626,7 +679,7 @@ def main():
     profiler.enable()
 
     # Run the card detection and recognition.
-    for im_ind in range(15, 30):
+    for im_ind in range(1, 4):
         card_detector.run_recognition(im_ind)
 
     # Stop profiling and organize and print profiling results.
