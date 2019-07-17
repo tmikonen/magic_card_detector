@@ -503,11 +503,13 @@ class TestImage:
                             candidate.is_fragment = True
                             #other_candidate.is_fragment = False
 
-    def plot_image_with_recognized(self):
+    def plot_image_with_recognized(self, visual=False):
         """
         Plots the recognized cards into the full image.
         """
         # Plotting
+        plt.imshow(cv2.cvtColor(self.original, cv2.COLOR_BGR2RGB))
+        plt.axis('off')
         for candidate in self.candidate_list:
             if not candidate.is_fragment:
                 full_image = self.adjusted
@@ -537,11 +539,20 @@ class TestImage:
         plt.savefig('results/MTG_card_recognition_results_' +
                     str(self.name.split('.jpg')[0]) +
                     '.jpg', dpi=600, bbox='tight')
-        if self.visual:
+        if visual:
             plt.show()
 
+    def print_recognized(self):
+        """
+        Prints out the recognized cards from the image.
+        """
+        print('Recognized cards:')
+        for candidate in self.candidate_list:
+            if candidate.is_recognized and not candidate.is_fragment:
+                print(candidate.name)
 
-class MTGCardDetector:
+
+class MagicCardDetector:
     """
     MTG card detector class.
     """
@@ -551,7 +562,7 @@ class MTGCardDetector:
         self.test_images = []
 
         self.verbose = False
-        self.visual = True
+        self.visual = False
 
         self.hash_separation_thr = 4.
         self.thr_lvl = 90
@@ -730,8 +741,7 @@ class MTGCardDetector:
         print('Recognition')
 
         iseg = 0
-        plt.imshow(cv2.cvtColor(test_image.original, cv2.COLOR_BGR2RGB))
-        plt.axis('off')
+        
 
         for candidate in test_image.candidate_list:
             im_seg = candidate.image
@@ -752,7 +762,8 @@ class MTGCardDetector:
                  candidate.name) = self.recognize_segment(im_seg)
         # Final fragment detection
         test_image.mark_fragments()
-        test_image.plot_image_with_recognized()
+        test_image.plot_image_with_recognized(self.visual)
+        test_image.print_recognized()
 
 
 def main():
@@ -763,7 +774,7 @@ def main():
     """
 
     # Instantiate the detector
-    card_detector = MTGCardDetector()
+    card_detector = MagicCardDetector()
 
     # Read the reference and test data sets
     card_detector.read_and_adjust_reference_images(
@@ -775,7 +786,7 @@ def main():
     profiler.enable()
 
     # Run the card detection and recognition.
-    for im_ind in range(0, 4):
+    for im_ind in range(1, 2):
         card_detector.run_recognition(im_ind)
 
     # Stop profiling and organize and print profiling results.
@@ -784,7 +795,7 @@ def main():
     sortby = pstats.SortKey.CUMULATIVE
     profiler_stats = pstats.Stats(
         profiler, stream=profiler_stream).sort_stats(sortby)
-    profiler_stats.print_stats(20)
+    profiler_stats.print_stats(40)
     print(profiler_stream.getvalue())
 
 
