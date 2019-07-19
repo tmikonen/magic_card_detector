@@ -22,32 +22,6 @@ import imagehash
 import cv2
 
 
-def order_points(pts):
-    """
-    Orders polygon points for the perspective transform.
-    """
-    # initialize a list of coordinates that will be ordered
-    # such that the first entry in the list is the top-left,
-    # the second entry is the top-right, the third is the
-    # bottom-right, and the fourth is the bottom-left
-    rect = np.zeros((4, 2), dtype="float32")
-
-    # the top-left point will have the smallest sum, whereas
-    # the bottom-right point will have the largest sum
-    rect[0] = pts[np.argmin(pts.sum(axis=1))]
-    rect[2] = pts[np.argmax(pts.sum(axis=1))]
-
-    # now, compute the difference between the points, the
-    # top-right point will have the smallest difference,
-    # whereas the bottom-left will have the largest difference
-    diff = np.diff(pts, axis=1)
-    rect[1] = pts[np.argmin(diff)]
-    rect[3] = pts[np.argmax(diff)]
-
-    # return the ordered coordinates
-    return rect
-
-
 def order_polygon_points(x_p, y_p):
     """
     Orders polygon points into a counterclockwise order.
@@ -61,6 +35,8 @@ def order_polygon_points(x_p, y_p):
 def four_point_transform(image, poly):
     """
     A perspective transform for a quadrilateral polygon.
+    Slightly modified version of the same function from
+    https://github.com/EdjeElectronics/OpenCV-Playing-Card-Detector
     """
     pts = np.zeros((4, 2))
     pts[:, 0] = np.asarray(poly.exterior.coords)[:-1, 0]
@@ -137,28 +113,6 @@ def line_intersection(x, y):
         xis = (xy_01 * (x[2] - x[3]) - (x[0] - x[1]) * xy_23) / denom
         yis = (xy_01 * (y[2] - y[3]) - (y[0] - y[1]) * xy_23) / denom
 
-    return (xis, yis)
-
-
-def line_intersection_old(x, y):
-    """
-    Calculates the intersection point of two lines, defined by the points
-    (x1, y1) and (x2, y2) (first line), and
-    (x3, y3) and (x4, y4) (second line).
-    If the lines are parallel, (nan, nan) is returned.
-    """
-    if (x[0] - x[1]) * (y[2] - y[3]) == (y[0] - y[1]) * (x[2] - x[3]):
-        # parallel lines
-        xis = np.nan
-        yis = np.nan
-    else:
-        xis = ((x[0] * y[1] - y[0] * x[1]) * (x[2] - x[3]) -
-               (x[0] - x[1]) * (x[2] * y[3] - y[2] * x[3])) / \
-              ((x[0] - x[1]) * (y[2] - y[3]) - (y[0] - y[1]) * (x[2] - x[3]))
-
-        yis = ((x[0] * y[1] - y[0] * x[1]) * (y[2] - y[3]) -
-               (y[0] - y[1]) * (x[2] * y[3] - y[2] * x[3])) / \
-              ((x[0] - x[1]) * (y[2] - y[3]) - (y[0] - y[1]) * (x[2] - x[3]))
     return (xis, yis)
 
 
@@ -383,7 +337,7 @@ def characterize_card_contour(card_contour,
     to several charasteristic parameters.
     """
     phull = convex_hull_polygon(card_contour)
-    if (phull.area < 0.7 * max_segment_area or
+    if (phull.area < 0.1 * max_segment_area or
             phull.area < image_area / 1000.):
         # break after card size range has been explored
         continue_segmentation = False
@@ -396,10 +350,10 @@ def characterize_card_contour(card_contour,
         qc_diff = quad_corner_diff(phull, bounding_poly)
         crop_factor = min(1., (1. - qc_diff * 22. / 100.))
         is_card_candidate = bool(
-            0.7 * max_segment_area < bounding_poly.area <
+            0.1 * max_segment_area < bounding_poly.area <
             image_area * 0.99 and
             qc_diff < 0.35 and
-            0.27 < polygon_form_factor(bounding_poly) < 0.32)
+            polygon_form_factor(bounding_poly) < 0.33)
 
     return (continue_segmentation,
             is_card_candidate,
@@ -415,10 +369,8 @@ class CardCandidate:
     """
     Class representing a segment of the image that may be a recognizable card.
     """
-
-    def __init__(self, im_seg, card_cnt, bquad, fraction):
+    def __init__(self, im_seg, bquad, fraction):
         self.image = im_seg
-        self.contour = card_cnt
         self.bounding_quad = bquad
         self.is_recognized = False
         self.recognition_score = 0.
@@ -513,22 +465,16 @@ class TestImage:
                 if i_area > 0.5 * min_area:
                     if (candidate.is_recognized and
                             other_candidate.is_recognized):
-                        #if (candidate.bounding_quad.area <
-                        #        other_candidate.bounding_quad.area):
                         if (candidate.recognition_score <
                                 other_candidate.recognition_score):
                             candidate.is_fragment = True
-                            #other_candidate.is_fragment = False
                         else:
-                            #candidate.is_fragment = False
                             other_candidate.is_fragment = True
                     else:
                         if candidate.is_recognized:
-                            #candidate.is_fragment = False
                             other_candidate.is_fragment = True
                         else:
                             candidate.is_fragment = True
-                            #other_candidate.is_fragment = False
 
     def plot_image_with_recognized(self, visual=False):
         """
@@ -575,8 +521,8 @@ class TestImage:
         """
         recognized_list = self.return_recognized()
         print('Recognized cards (' +
-                str(len(recognized_list)) +
-                ' cards):')
+              str(len(recognized_list)) +
+              ' cards):')
         for card in recognized_list:
             print(card.name)
 
@@ -616,11 +562,13 @@ class MagicCardDetector:
         hlist = []
         for image in self.reference_images:
             hlist.append(ReferenceImage(image.name,
-             None, None, image.phash))
+                                        None,
+                                        None,
+                                        image.phash))
 
-        with open('alpha_reference_phash.dat', 'wb') as f:
-            pickle.dump(hlist, f)
-    
+        with open(path, 'wb') as fhandle:
+            pickle.dump(hlist, fhandle)
+
     def read_prehashed_reference_data(self, path):
         """
         Reads pre-calculated hashes of the reference images.
@@ -633,7 +581,7 @@ class MagicCardDetector:
             self.reference_images.append(
                 ReferenceImage(ref_im.name, None, self.clahe, ref_im.phash))
         print('Done.')
-    
+
     def read_and_adjust_reference_images(self, path):
         """
         Reads and histogram-adjusts the reference image set.
@@ -663,52 +611,74 @@ class MagicCardDetector:
                 TestImage(img_name, img, self.clahe))
         print('Done.')
 
-    def contour_image(self, full_image):
+    def contour_image_gray(self, full_image, thresholding='adaptive'):
         """
         Grayscale transform, thresholding, countouring and sorting by area.
         """
         gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
-        _, thresh = cv2.threshold(gray, self.thr_lvl, 255, cv2.THRESH_BINARY)
+        if thresholding == 'adaptive':
+            fltr_size = 1 + 2 * (min(full_image.shape[0],
+                                     full_image.shape[1]) // 20)
+            thresh = cv2.adaptiveThreshold(gray,
+                                           255,
+                                           cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                           cv2.THRESH_BINARY,
+                                           fltr_size,
+                                           5)
+        else:
+            _, thresh = cv2.threshold(gray,
+                                      70,
+                                      255,
+                                      cv2.THRESH_BINARY)
+        if self.visual:
+            plt.imshow(thresh)
+            plt.show()
+
         _, contours, _ = cv2.findContours(
             np.uint8(thresh), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        contours_sorted = sorted(contours, key=cv2.contourArea, reverse=True)
-        return contours_sorted
+        return contours
 
     def contour_image_rgb(self, full_image):
         """
         Grayscale transform, thresholding, countouring and sorting by area.
         """
-        gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
         blue, green, red = cv2.split(full_image)
-        _, thresh = cv2.threshold(gray, self.thr_lvl, 255, cv2.THRESH_BINARY)
-        _, thr_b = cv2.threshold(blue, 90, 255, cv2.THRESH_BINARY)
-        _, thr_g = cv2.threshold(green, 90, 255, cv2.THRESH_BINARY)
-        _, thr_r = cv2.threshold(red, 90, 255, cv2.THRESH_BINARY)
-        _, contours_gray, _ = cv2.findContours(
-            np.uint8(thresh), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        blue = self.clahe.apply(blue)
+        green = self.clahe.apply(green)
+        red = self.clahe.apply(red)
+        _, thr_b = cv2.threshold(blue, 110, 255, cv2.THRESH_BINARY)
+        _, thr_g = cv2.threshold(green, 110, 255, cv2.THRESH_BINARY)
+        _, thr_r = cv2.threshold(red, 110, 255, cv2.THRESH_BINARY)
         _, contours_b, _ = cv2.findContours(
             np.uint8(thr_b), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         _, contours_g, _ = cv2.findContours(
             np.uint8(thr_g), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         _, contours_r, _ = cv2.findContours(
             np.uint8(thr_r), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        contours = contours_gray + contours_b + contours_g + contours_r
+        contours = contours_b + contours_g + contours_r
+        return contours
+
+    def contour_image(self, full_image, mode='gray'):
+        """
+        Wrapper for selecting the countouring / thresholding algorithm
+        """
+        if mode == 'gray':
+            contours = self.contour_image_gray(full_image,
+                                               thresholding='simple')
+        elif mode == 'rgb':
+            contours = self.contour_image_rgb(full_image)
+        elif mode == 'all':
+            contours = self.contour_image_gray(full_image,
+                                               thresholding='simple')
+            contours += self.contour_image_gray(full_image,
+                                               thresholding='adaptive')
+            contours += self.contour_image_rgb(full_image)
+        else:
+            raise ValueError('Unknown segmentation mode.')
         contours_sorted = sorted(contours, key=cv2.contourArea, reverse=True)
         return contours_sorted
 
-    def contour_image_canny(self, full_image):
-        """
-        Grayscale and RGB transform, thresholding, countouring and sorting.
-        """
-        gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
-        gray = cv2.bilateralFilter(gray, 5, 11, 11)
-        edges = cv2.Canny(gray, 50, 100)
-        _, contours, _ = cv2.findContours(
-            np.uint8(edges), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-        contours_sorted = sorted(contours, key=cv2.contourArea, reverse=True)
-        return contours_sorted
-
-    def segment_image(self, test_image, mode='gray'):
+    def segment_image(self, test_image, contouring_mode='gray'):
         """
         Segments the given image into card candidates, that is,
         regions of the image that have a high chance
@@ -718,14 +688,7 @@ class MagicCardDetector:
         image_area = full_image.shape[0] * full_image.shape[1]
         max_segment_area = 0.01  # largest card area
 
-        # contours = self.contour_image(full_image)
-        if mode == 'gray':
-            contours = self.contour_image(full_image)
-        elif mode =='rgb':
-            contours = self.contour_image_rgb(full_image)
-        else:
-            raise ValueError('Unknown segmentation mode.')
-
+        contours = self.contour_image(full_image, mode=contouring_mode) 
         for card_contour in contours:
             (continue_segmentation,
              is_card_candidate,
@@ -744,7 +707,6 @@ class MagicCardDetector:
                                                     origin='centroid'))
                 test_image.candidate_list.append(
                     CardCandidate(warped,
-                                  card_contour,
                                   bounding_poly,
                                   bounding_poly.area / image_area))
                 if self.verbose:
@@ -776,7 +738,7 @@ class MagicCardDetector:
         d_0_dist = np.zeros(len(rotations))
         d_0 = np.zeros((len(self.reference_images), len(rotations)))
         for j, rot in enumerate(rotations):
-            if not (-1.e-5 < rot < 1.e-5):
+            if not -1.e-5 < rot < 1.e-5:
                 phash_im = imagehash.phash(PILImage.fromarray(
                     np.uint8(255 * cv2.cvtColor(rotate(im_seg, rot),
                                                 cv2.COLOR_BGR2RGB))),
@@ -814,7 +776,6 @@ class MagicCardDetector:
         The image has been read in and adjusted previously,
         and is contained in the internal data list of the class.
         """
-
         test_image = self.test_images[image_index]
 
         if self.visual:
@@ -826,20 +787,16 @@ class MagicCardDetector:
         print('Segmentating card candidates out of the image...')
 
         test_image.candidate_list.clear()
-        self.segment_image(test_image)
+        self.segment_image(test_image, contouring_mode='gray')
 
         print('Done. Found ' +
               str(len(test_image.candidate_list)) + ' candidates.')
         print('Recognizing candidates.')
 
-        iseg = 0
-
-        for candidate in test_image.candidate_list:
+        for i_cand, candidate in enumerate(test_image.candidate_list):
             im_seg = candidate.image
-
-            iseg += 1
             if self.verbose:
-                print(str(iseg) + " / " +
+                print(str(i_cand + 1) + " / " +
                       str(len(test_image.candidate_list)))
 
             # Easy fragment / duplicate detection
@@ -852,10 +809,10 @@ class MagicCardDetector:
                 (candidate.is_recognized,
                  candidate.recognition_score,
                  candidate.name) = self.recognize_segment(im_seg)
-        
+
         print('Done. Found ' +
               str(len(test_image.return_recognized())) +
-              ' cards.' )
+              ' cards.')
         print('Removing duplicates...')
         # Final fragment detection
         test_image.mark_fragments()
@@ -873,9 +830,11 @@ def main():
     Example run.
     Can be used also purely through the defined classes.
     """
-
     # Instantiate the detector
     card_detector = MagicCardDetector()
+
+    do_profile = False
+    card_detector.visual = True
 
     # Read the reference and test data sets
     # card_detector.read_and_adjust_reference_images(
@@ -883,33 +842,31 @@ def main():
     card_detector.read_prehashed_reference_data('./alpha_reference_phash.dat')
     card_detector.read_and_adjust_test_images('../MTG_alpha_test_images/')
 
-    # Start up the profiler.
-    profiler = cProfile.Profile()
-    profiler.enable()
+    if do_profile:
+        # Start up the profiler.
+        profiler = cProfile.Profile()
+        profiler.enable()
 
     # Run the card detection and recognition.
+    # 9 = blue aggro
+    # 7 = wizards2
+    # 5 = swamp
+    # 6 = instill energy
+
+
     for im_ind in range(7, 8):
         card_detector.run_recognition(im_ind)
 
-    #recognized_candidates = card_detector.test_images[1].return_recognized()
-
-    
-
-
-    #for i in range(100):
-    #    phull = convex_hull_polygon(recognized_candidates[0].contour)
-    #   simple_poly = simplify_polygon(phull)
-    #    bounding_quads = generate_quad_candidates(simple_poly)
-    #print(len(bounding_quads))
-    # Stop profiling and organize and print profiling results.
-    profiler.disable()
-    profiler.dump_stats('magic_card_detector.prof')
-    profiler_stream = io.StringIO()
-    sortby = pstats.SortKey.CUMULATIVE
-    profiler_stats = pstats.Stats(
-        profiler, stream=profiler_stream).sort_stats(sortby)
-    profiler_stats.print_stats(20)
-    print(profiler_stream.getvalue())
+    if do_profile:
+        # Stop profiling and organize and print profiling results.
+        profiler.disable()
+        profiler.dump_stats('magic_card_detector.prof')
+        profiler_stream = io.StringIO()
+        sortby = pstats.SortKey.CUMULATIVE
+        profiler_stats = pstats.Stats(
+            profiler, stream=profiler_stream).sort_stats(sortby)
+        profiler_stats.print_stats(20)
+        print(profiler_stream.getvalue())
 
 
 if __name__ == "__main__":
