@@ -353,7 +353,7 @@ def characterize_card_contour(card_contour,
             0.1 * max_segment_area < bounding_poly.area <
             image_area * 0.99 and
             qc_diff < 0.35 and
-            polygon_form_factor(bounding_poly) < 0.33)
+            0.25 < polygon_form_factor(bounding_poly) < 0.33)
 
     return (continue_segmentation,
             is_card_candidate,
@@ -601,11 +601,20 @@ class MagicCardDetector:
         """
         Reads and histogram-adjusts the test image set.
         """
+        maxsize = 1000
         print('Reading images from ' + str(path))
         print('...', end=' ')
         filenames = glob.glob(path + '*.jpg')
         for filename in filenames:
             img = cv2.imread(filename)
+            #resize?
+            if min(img.shape[0], img.shape[1]) > maxsize:
+                scalef = maxsize / min(img.shape[0], img.shape[1])
+                img = cv2.resize(img,
+                                 (int(img.shape[1] * scalef),
+                                  int(img.shape[0] * scalef)),
+                                  interpolation = cv2.INTER_AREA)
+
             img_name = filename.split(path)[1]
             self.test_images.append(
                 TestImage(img_name, img, self.clahe))
@@ -618,13 +627,19 @@ class MagicCardDetector:
         gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
         if thresholding == 'adaptive':
             fltr_size = 1 + 2 * (min(full_image.shape[0],
-                                     full_image.shape[1]) // 20)
+                                     full_image.shape[1]) // 8)
             thresh = cv2.adaptiveThreshold(gray,
                                            255,
                                            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                            cv2.THRESH_BINARY,
                                            fltr_size,
-                                           5)
+                                           20)
+        elif thresholding == 'otsu':
+            gray = cv2.GaussianBlur(gray,(3,3),0)
+            _, thresh = cv2.threshold(gray,
+                                      10,
+                                      255,
+                                      cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         else:
             _, thresh = cv2.threshold(gray,
                                       70,
@@ -665,6 +680,12 @@ class MagicCardDetector:
         if mode == 'gray':
             contours = self.contour_image_gray(full_image,
                                                thresholding='simple')
+        elif mode == 'otsu':
+            contours = self.contour_image_gray(full_image,
+                                               thresholding='otsu')
+        elif mode == 'adaptive':
+            contours = self.contour_image_gray(full_image,
+                                               thresholding='adaptive')
         elif mode == 'rgb':
             contours = self.contour_image_rgb(full_image)
         elif mode == 'all':
@@ -787,7 +808,7 @@ class MagicCardDetector:
         print('Segmentating card candidates out of the image...')
 
         test_image.candidate_list.clear()
-        self.segment_image(test_image, contouring_mode='gray')
+        self.segment_image(test_image, contouring_mode='adaptive')
 
         print('Done. Found ' +
               str(len(test_image.candidate_list)) + ' candidates.')
