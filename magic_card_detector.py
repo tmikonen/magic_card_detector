@@ -7,6 +7,7 @@ import cProfile
 import pstats
 import io
 import pickle
+from copy import deepcopy
 from itertools import product
 
 import numpy as np
@@ -383,7 +384,8 @@ class CardCandidate:
         Returns whether the bounding polygon of the card candidate
         contains the bounding polygon of the other candidate.
         """
-        return other.bounding_quad.within(self.bounding_quad)
+        return bool(other.bounding_quad.within(self.bounding_quad) and
+                    other.name == self.name)
 
 
 class ReferenceImage:
@@ -524,7 +526,9 @@ class TestImage:
               str(len(recognized_list)) +
               ' cards):')
         for card in recognized_list:
-            print(card.name)
+            print(card.name +
+                  '  - with score ' +
+                  str(card.recognition_score))
 
     def return_recognized(self):
         """
@@ -535,6 +539,36 @@ class TestImage:
             if candidate.is_recognized and not candidate.is_fragment:
                 recognized_list.append(candidate)
         return recognized_list
+
+    def discard_unrecognized_candidates(self):
+        """
+        Trims the candidate list to keep only the recognized ones
+        """
+        recognized_list = deepcopy(self.return_recognized())
+        self.candidate_list.clear()
+        self.candidate_list = recognized_list
+
+    def may_contain_more_cards(self):
+        """
+        Simple area-based test to see if using a different segmentation
+        algorithm may lead to finding more cards in the image.
+        """
+        recognized_list = self.return_recognized()
+        if len(recognized_list) == 0:
+            return True
+        tot_area = 0.
+        min_area = 1.
+        for card in recognized_list:
+            tot_area += card.image_area_fraction
+            if card.image_area_fraction < min_area:
+                min_area = card.image_area_fraction
+        if tot_area + 1.5 * min_area > 1.:
+            return False
+        else:
+            return True
+
+
+
 
 
 class MagicCardDetector:
@@ -627,13 +661,13 @@ class MagicCardDetector:
         gray = cv2.cvtColor(full_image, cv2.COLOR_BGR2GRAY)
         if thresholding == 'adaptive':
             fltr_size = 1 + 2 * (min(full_image.shape[0],
-                                     full_image.shape[1]) // 8)
+                                     full_image.shape[1]) // 20)
             thresh = cv2.adaptiveThreshold(gray,
                                            255,
                                            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
                                            cv2.THRESH_BINARY,
                                            fltr_size,
-                                           20)
+                                           10)
         elif thresholding == 'otsu':
             gray = cv2.GaussianBlur(gray,(3,3),0)
             _, thresh = cv2.threshold(gray,
@@ -645,7 +679,7 @@ class MagicCardDetector:
                                       70,
                                       255,
                                       cv2.THRESH_BINARY)
-        if self.visual:
+        if self.visual and self.verbose:
             plt.imshow(thresh)
             plt.show()
 
@@ -671,6 +705,13 @@ class MagicCardDetector:
         _, contours_r, _ = cv2.findContours(
             np.uint8(thr_r), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         contours = contours_b + contours_g + contours_r
+        if self.visual and self.verbose:
+            plt.imshow(thr_r)
+            plt.show()
+            plt.imshow(thr_g)
+            plt.show()
+            plt.imshow(thr_b)
+            plt.show()
         return contours
 
     def contour_image(self, full_image, mode='gray'):
@@ -711,11 +752,20 @@ class MagicCardDetector:
 
         contours = self.contour_image(full_image, mode=contouring_mode) 
         for card_contour in contours:
-            (continue_segmentation,
-             is_card_candidate,
-             bounding_poly,
-             crop_factor) = characterize_card_contour(
-                 card_contour, max_segment_area, image_area)
+            try:
+                (continue_segmentation,
+                 is_card_candidate,
+                 bounding_poly,
+                 crop_factor) = characterize_card_contour(
+                    card_contour, max_segment_area, image_area)
+            except NotImplementedError as nie:
+                # this can occur in Shapely for some funny contour shapes
+                # resolve by discarding the candidate
+                print(nie)
+                (continue_segmentation,
+                 is_card_candidate,
+                 bounding_poly,
+                 crop_factor) = (True, False, None, 1.)
             if not continue_segmentation:
                 break
             if is_card_candidate:
@@ -793,9 +843,8 @@ class MagicCardDetector:
 
     def run_recognition(self, image_index):
         """
-        Tries to recognize cards from the image specified.
-        The image has been read in and adjusted previously,
-        and is contained in the internal data list of the class.
+        The top-level image recognition method.
+        Wrapper for switching to different algorithms and re-trying.
         """
         test_image = self.test_images[image_index]
 
@@ -804,11 +853,33 @@ class MagicCardDetector:
             plt.imshow(cv2.cvtColor(test_image.original,
                                     cv2.COLOR_BGR2RGB))
             plt.show()
+        
+        alg_list = ['adaptive', 'rgb']
 
+        for alg in alg_list:
+            self.recognize_cards_in_image(test_image, alg)
+            test_image.discard_unrecognized_candidates()
+            if (not test_image.may_contain_more_cards() or
+                len(test_image.return_recognized()) > 5):
+                break
+
+        print('Plotting and saving the results...')
+        test_image.plot_image_with_recognized(self.visual)
+        print('Done.')
+        test_image.print_recognized()
+        print('Recognition done.')
+
+    def recognize_cards_in_image(self, test_image, contouring_mode):
+        """
+        Tries to recognize cards from the image specified.
+        The image has been read in and adjusted previously,
+        and is contained in the internal data list of the class.
+        """
         print('Segmentating card candidates out of the image...')
+        print('Using ' + str(contouring_mode) + ' algorithm.')
 
         test_image.candidate_list.clear()
-        self.segment_image(test_image, contouring_mode='adaptive')
+        self.segment_image(test_image, contouring_mode=contouring_mode)
 
         print('Done. Found ' +
               str(len(test_image.candidate_list)) + ' candidates.')
@@ -834,15 +905,13 @@ class MagicCardDetector:
         print('Done. Found ' +
               str(len(test_image.return_recognized())) +
               ' cards.')
+        if self.verbose:
+            for card in test_image.return_recognized():
+                print(card.name + '; S = ' + str(card.recognition_score))
         print('Removing duplicates...')
         # Final fragment detection
         test_image.mark_fragments()
         print('Done.')
-        print('Plotting and saving the results...')
-        test_image.plot_image_with_recognized(self.visual)
-        print('Done.')
-        test_image.print_recognized()
-        print('Recognition done.')
 
 
 def main():
@@ -856,12 +925,13 @@ def main():
 
     do_profile = False
     card_detector.visual = True
+    card_detector.verbose = False
 
     # Read the reference and test data sets
     # card_detector.read_and_adjust_reference_images(
     #     '../../MTG/Card_Images/LEA/')
     card_detector.read_prehashed_reference_data('./alpha_reference_phash.dat')
-    card_detector.read_and_adjust_test_images('../MTG_alpha_test_images/')
+    card_detector.read_and_adjust_test_images('../MTG_alpha_test_images2/')
 
     if do_profile:
         # Start up the profiler.
@@ -875,8 +945,9 @@ def main():
     # 6 = instill energy
 
 
-    for im_ind in range(7, 8):
+    for im_ind in range(0, 23):
         card_detector.run_recognition(im_ind)
+    #card_detector.run_recognition(3)
 
     if do_profile:
         # Stop profiling and organize and print profiling results.
