@@ -9,6 +9,7 @@ import io
 import pickle
 from copy import deepcopy
 from itertools import product
+from dataclasses import dataclass
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -23,14 +24,14 @@ import imagehash
 import cv2
 
 
-def order_polygon_points(x_p, y_p):
+def order_polygon_points(x, y):
     """
     Orders polygon points into a counterclockwise order.
     x_p, y_p are the x and y coordinates of the polygon points.
     """
-    angle = np.arctan2(y_p - np.average(y_p), x_p - np.average(x_p))
+    angle = np.arctan2(y - np.average(y), x - np.average(x))
     ind = np.argsort(angle)
-    return (x_p[ind], y_p[ind])
+    return (x[ind], y[ind])
 
 
 def four_point_transform(image, poly):
@@ -134,8 +135,8 @@ def simplify_polygon(in_poly,
     if segment_to_remove is not None:
         maxiter = 1
     while len_poly > 4:
-        d_in = np.sqrt(np.ediff1d(x_in, to_end=x_in[0]-x_in[-1]) ** 2. +
-                       np.ediff1d(y_in, to_end=y_in[0]-y_in[-1]) ** 2.)
+        d_in = np.sqrt(np.ediff1d(x_in, to_end=x_in[0] - x_in[-1]) ** 2. +
+                       np.ediff1d(y_in, to_end=y_in[0] - y_in[-1]) ** 2.)
         d_tot = np.sum(d_in)
         if segment_to_remove is not None:
             k = segment_to_remove
@@ -146,8 +147,8 @@ def simplify_polygon(in_poly,
             (xis, yis) = line_intersection(x_in[ind], y_in[ind])
             x_in[k] = xis
             y_in[k] = yis
-            x_in = np.delete(x_in, (k+1) % len_poly)
-            y_in = np.delete(y_in, (k+1) % len_poly)
+            x_in = np.delete(x_in, (k + 1) % len_poly)
+            y_in = np.delete(y_in, (k + 1) % len_poly)
             len_poly = len(x_in)
             niter += 1
             if (maxiter is not None) and (niter >= maxiter):
@@ -243,6 +244,7 @@ def generate_quad_candidates(in_poly):
                 quads.append(quad)
     return quads
 
+
 def get_bounding_quad(hull_poly):
     """
     Returns the minimum area quadrilateral that contains (bounds)
@@ -306,7 +308,7 @@ def quad_corner_diff(hull_poly, bquad_poly, region_size=0.9):
         quad_corner_area += capoly.area
         hull_corner_area += capoly.intersection(hull_poly).area
 
-    return 1. - hull_corner_area/quad_corner_area
+    return 1. - hull_corner_area / quad_corner_area
 
 
 def convex_hull_polygon(contour):
@@ -327,7 +329,7 @@ def polygon_form_factor(poly):
     # minimum side length
     d_0 = np.amin(np.sqrt(np.sum(np.diff(np.asarray(poly.exterior.coords),
                                          axis=0) ** 2., axis=1)))
-    return poly.area/(poly.length * d_0)
+    return poly.area / (poly.length * d_0)
 
 
 def characterize_card_contour(card_contour,
@@ -366,18 +368,27 @@ def characterize_card_contour(card_contour,
 #
 
 
+@dataclass
 class CardCandidate:
     """
     Class representing a segment of the image that may be a recognizable card.
     """
-    def __init__(self, im_seg, bquad, fraction):
-        self.image = im_seg
-        self.bounding_quad = bquad
-        self.is_recognized = False
-        self.recognition_score = 0.
-        self.is_fragment = False
-        self.image_area_fraction = fraction
-        self.name = 'unknown'
+    image: np.ndarray
+    bounding_quad: Polygon
+    image_area_fraction: float
+    is_recognized: bool = False
+    recognition_score: float = 0.
+    is_fragment: bool = False
+    name: str = 'unknown'
+
+    # def __init__(self, im_seg, bquad, fraction):
+    #    self.image = im_seg
+    #    self.bounding_quad = bquad
+    #    self.is_recognized = False
+    #    self.recognition_score = 0.
+    #    self.is_fragment = False
+    #    self.image_area_fraction = fraction
+    #    self.name = 'unknown'
 
     def contains(self, other):
         """
@@ -409,9 +420,9 @@ class ReferenceImage:
         Calculates the perceptive hash for the image
         """
         self.phash = imagehash.phash(
-                        PILImage.fromarray(np.uint8(255 * cv2.cvtColor(
-                            self.adjusted, cv2.COLOR_BGR2RGB))),
-                        hash_size=32)
+            PILImage.fromarray(np.uint8(255 * cv2.cvtColor(
+                self.adjusted, cv2.COLOR_BGR2RGB))),
+            hash_size=32)
 
     def histogram_adjust(self):
         """
@@ -554,7 +565,7 @@ class TestImage:
         algorithm may lead to finding more cards in the image.
         """
         recognized_list = self.return_recognized()
-        if len(recognized_list) == 0:
+        if not recognized_list:
             return True
         tot_area = 0.
         min_area = 1.
@@ -562,13 +573,7 @@ class TestImage:
             tot_area += card.image_area_fraction
             if card.image_area_fraction < min_area:
                 min_area = card.image_area_fraction
-        if tot_area + 1.5 * min_area > 1.:
-            return False
-        else:
-            return True
-
-
-
+        return bool(tot_area + 1.5 * min_area < 1.)
 
 
 class MagicCardDetector:
@@ -641,13 +646,12 @@ class MagicCardDetector:
         filenames = glob.glob(path + '*.jpg')
         for filename in filenames:
             img = cv2.imread(filename)
-            #resize?
             if min(img.shape[0], img.shape[1]) > maxsize:
                 scalef = maxsize / min(img.shape[0], img.shape[1])
                 img = cv2.resize(img,
                                  (int(img.shape[1] * scalef),
                                   int(img.shape[0] * scalef)),
-                                  interpolation = cv2.INTER_AREA)
+                                 interpolation=cv2.INTER_AREA)
 
             img_name = filename.split(path)[1]
             self.test_images.append(
@@ -668,12 +672,6 @@ class MagicCardDetector:
                                            cv2.THRESH_BINARY,
                                            fltr_size,
                                            10)
-        elif thresholding == 'otsu':
-            gray = cv2.GaussianBlur(gray,(3,3),0)
-            _, thresh = cv2.threshold(gray,
-                                      10,
-                                      255,
-                                      cv2.THRESH_BINARY + cv2.THRESH_OTSU)
         else:
             _, thresh = cv2.threshold(gray,
                                       70,
@@ -721,9 +719,6 @@ class MagicCardDetector:
         if mode == 'gray':
             contours = self.contour_image_gray(full_image,
                                                thresholding='simple')
-        elif mode == 'otsu':
-            contours = self.contour_image_gray(full_image,
-                                               thresholding='otsu')
         elif mode == 'adaptive':
             contours = self.contour_image_gray(full_image,
                                                thresholding='adaptive')
@@ -733,7 +728,7 @@ class MagicCardDetector:
             contours = self.contour_image_gray(full_image,
                                                thresholding='simple')
             contours += self.contour_image_gray(full_image,
-                                               thresholding='adaptive')
+                                                thresholding='adaptive')
             contours += self.contour_image_rgb(full_image)
         else:
             raise ValueError('Unknown segmentation mode.')
@@ -750,14 +745,15 @@ class MagicCardDetector:
         image_area = full_image.shape[0] * full_image.shape[1]
         max_segment_area = 0.01  # largest card area
 
-        contours = self.contour_image(full_image, mode=contouring_mode) 
+        contours = self.contour_image(full_image, mode=contouring_mode)
         for card_contour in contours:
             try:
                 (continue_segmentation,
                  is_card_candidate,
                  bounding_poly,
-                 crop_factor) = characterize_card_contour(
-                    card_contour, max_segment_area, image_area)
+                 crop_factor) = characterize_card_contour(card_contour,
+                                                          max_segment_area,
+                                                          image_area)
             except NotImplementedError as nie:
                 # this can occur in Shapely for some funny contour shapes
                 # resolve by discarding the candidate
@@ -769,7 +765,7 @@ class MagicCardDetector:
             if not continue_segmentation:
                 break
             if is_card_candidate:
-                if max_segment_area == 0.01:
+                if max_segment_area < 0.1:
                     max_segment_area = bounding_poly.area
                 warped = four_point_transform(full_image,
                                               scale(bounding_poly,
@@ -810,26 +806,26 @@ class MagicCardDetector:
         d_0 = np.zeros((len(self.reference_images), len(rotations)))
         for j, rot in enumerate(rotations):
             if not -1.e-5 < rot < 1.e-5:
-                phash_im = imagehash.phash(PILImage.fromarray(
-                    np.uint8(255 * cv2.cvtColor(rotate(im_seg, rot),
-                                                cv2.COLOR_BGR2RGB))),
-                                           hash_size=32)
+                phash_im = imagehash.phash(
+                    PILImage.fromarray(np.uint8(255 * cv2.cvtColor(
+                        rotate(im_seg, rot), cv2.COLOR_BGR2RGB))),
+                    hash_size=32)
             else:
-                phash_im = imagehash.phash(PILImage.fromarray(
-                    np.uint8(255 * cv2.cvtColor(im_seg,
-                                                cv2.COLOR_BGR2RGB))),
-                                           hash_size=32)
+                phash_im = imagehash.phash(
+                    PILImage.fromarray(np.uint8(255 * cv2.cvtColor(
+                        im_seg, cv2.COLOR_BGR2RGB))),
+                    hash_size=32)
             d_0[:, j] = self.phash_diff(phash_im)
             d_0_ = d_0[d_0[:, j] > np.amin(d_0[:, j]), j]
             d_0_ave = np.average(d_0_)
             d_0_std = np.std(d_0_)
-            d_0_dist[j] = (d_0_ave - np.amin(d_0[:, j]))/d_0_std
+            d_0_dist[j] = (d_0_ave - np.amin(d_0[:, j])) / d_0_std
             if self.verbose:
                 print('Phash statistical distance' + str(d_0_dist[j]))
             if (d_0_dist[j] > self.hash_separation_thr and
                     np.argmax(d_0_dist) == j):
                 card_name = self.reference_images[np.argmin(d_0[:, j])]\
-                            .name.split('.jpg')[0]
+                    .name.split('.jpg')[0]
                 is_recognized = True
                 recognition_score = d_0_dist[j] / self.hash_separation_thr
                 break
@@ -853,14 +849,14 @@ class MagicCardDetector:
             plt.imshow(cv2.cvtColor(test_image.original,
                                     cv2.COLOR_BGR2RGB))
             plt.show()
-        
+
         alg_list = ['adaptive', 'rgb']
 
         for alg in alg_list:
             self.recognize_cards_in_image(test_image, alg)
             test_image.discard_unrecognized_candidates()
             if (not test_image.may_contain_more_cards() or
-                len(test_image.return_recognized()) > 5):
+                    len(test_image.return_recognized()) > 5):
                 break
 
         print('Plotting and saving the results...')
@@ -944,10 +940,9 @@ def main():
     # 5 = swamp
     # 6 = instill energy
 
-
-    for im_ind in range(0, 23):
+    for im_ind in range(0, 1):
         card_detector.run_recognition(im_ind)
-    #card_detector.run_recognition(3)
+    # card_detector.run_recognition(3)
 
     if do_profile:
         # Stop profiling and organize and print profiling results.
