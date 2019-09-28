@@ -837,32 +837,38 @@ class MagicCardDetector:
         """
         return self.phash_compare(image_segment)
 
-    def run_recognition(self, image_index):
+    def run_recognition(self, image_index=None):
         """
         The top-level image recognition method.
         Wrapper for switching to different algorithms and re-trying.
         """
-        test_image = self.test_images[image_index]
+        if image_index is None:
+            image_index = range(len(self.test_images))
+        elif not isinstance(image_index, list):
+            image_index = [image_index]
+        for i in image_index:
+            test_image = self.test_images[i]
+            print('Accessing image ' + test_image.name)
 
-        if self.visual:
-            print('Original image')
-            plt.imshow(cv2.cvtColor(test_image.original,
-                                    cv2.COLOR_BGR2RGB))
-            plt.show()
+            if self.visual:
+                print('Original image')
+                plt.imshow(cv2.cvtColor(test_image.original,
+                                        cv2.COLOR_BGR2RGB))
+                plt.show()
 
-        alg_list = ['adaptive', 'rgb']
+            alg_list = ['adaptive', 'rgb']
 
-        for alg in alg_list:
-            self.recognize_cards_in_image(test_image, alg)
-            test_image.discard_unrecognized_candidates()
-            if (not test_image.may_contain_more_cards() or
-                    len(test_image.return_recognized()) > 5):
-                break
+            for alg in alg_list:
+                self.recognize_cards_in_image(test_image, alg)
+                test_image.discard_unrecognized_candidates()
+                if (not test_image.may_contain_more_cards() or
+                        len(test_image.return_recognized()) > 5):
+                    break
 
-        print('Plotting and saving the results...')
-        test_image.plot_image_with_recognized(self.visual)
-        print('Done.')
-        test_image.print_recognized()
+            print('Plotting and saving the results...')
+            test_image.plot_image_with_recognized(self.visual)
+            print('Done.')
+            test_image.print_recognized()
         print('Recognition done.')
 
     def recognize_cards_in_image(self, test_image, contouring_mode):
@@ -940,9 +946,7 @@ def main():
     # 5 = swamp
     # 6 = instill energy
 
-    for im_ind in range(0, 1):
-        card_detector.run_recognition(im_ind)
-    # card_detector.run_recognition(3)
+    card_detector.run_recognition(6)
 
     if do_profile:
         # Stop profiling and organize and print profiling results.
