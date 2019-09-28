@@ -1,5 +1,7 @@
 """
 Module for detecting and recognizing Magic: the Gathering cards from an image.
+author: Timo Ikonen
+email: timo.ikonen (at) iki.fi
 """
 
 import glob
