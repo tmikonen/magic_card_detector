@@ -5,10 +5,12 @@ email: timo.ikonen (at) iki.fi
 """
 
 import glob
+import os
 import cProfile
 import pstats
 import io
 import pickle
+import argparse
 from copy import deepcopy
 from itertools import product
 from dataclasses import dataclass
@@ -471,8 +473,10 @@ class TestImage:
         """
         for (candidate, other_candidate) in product(self.candidate_list,
                                                     repeat=2):
+            if candidate.is_fragment or other_candidate.is_fragment:
+                continue
             if ((candidate.is_recognized or other_candidate.is_recognized) and
-                    candidate != other_candidate):
+                    candidate is not other_candidate):
                 i_area = candidate.bounding_quad.intersection(
                     other_candidate.bounding_quad).area
                 min_area = min(candidate.bounding_quad.area,
@@ -491,11 +495,12 @@ class TestImage:
                         else:
                             candidate.is_fragment = True
 
-    def plot_image_with_recognized(self, visual=False):
+    def plot_image_with_recognized(self, output_path, visual=False):
         """
         Plots the recognized cards into the full image.
         """
         # Plotting
+        plt.figure()
         plt.imshow(cv2.cvtColor(self.original, cv2.COLOR_BGR2RGB))
         plt.axis('off')
         for candidate in self.candidate_list:
@@ -514,17 +519,17 @@ class TestImage:
                 bounding_poly = Polygon([[x, y] for (x, y) in
                                          zip(bquad_corners[:, 0],
                                              bquad_corners[:, 1])])
-                fntsze = int(4 * bounding_poly.length / full_image.shape[1])
+                fntsze = int(6 * bounding_poly.length / full_image.shape[1])
                 bbox_color = 'white' if candidate.is_recognized else 'red'
                 plt.text(np.average(bquad_corners[:, 0]),
                          np.average(bquad_corners[:, 1]),
-                         candidate.name,
+                         candidate.name.capitalize(),
                          horizontalalignment='center',
                          fontsize=fntsze,
                          bbox=dict(facecolor=bbox_color,
                                    alpha=0.7))
 
-        plt.savefig('results/MTG_card_recognition_results_' +
+        plt.savefig(output_path + '/MTG_card_recognition_results_' +
                     str(self.name.split('.jpg')[0]) +
                     '.jpg', dpi=600, bbox='tight')
         if visual:
@@ -583,9 +588,10 @@ class MagicCardDetector:
     MTG card detector class.
     """
 
-    def __init__(self):
+    def __init__(self, output_path):
         self.reference_images = []
         self.test_images = []
+        self.output_path = output_path
 
         self.verbose = False
         self.visual = False
@@ -645,7 +651,7 @@ class MagicCardDetector:
         maxsize = 1000
         print('Reading images from ' + str(path))
         print('...', end=' ')
-        filenames = glob.glob(path + '*.jpg')
+        filenames = glob.glob(path.rstrip('/') + '/*.jpg')
         for filename in filenames:
             img = cv2.imread(filename)
             if min(img.shape[0], img.shape[1]) > maxsize:
@@ -655,7 +661,7 @@ class MagicCardDetector:
                                   int(img.shape[0] * scalef)),
                                  interpolation=cv2.INTER_AREA)
 
-            img_name = filename.split(path)[1]
+            img_name = os.path.basename(filename)
             self.test_images.append(
                 TestImage(img_name, img, self.clahe))
         print('Done.')
@@ -823,7 +829,7 @@ class MagicCardDetector:
             d_0_std = np.std(d_0_)
             d_0_dist[j] = (d_0_ave - np.amin(d_0[:, j])) / d_0_std
             if self.verbose:
-                print('Phash statistical distance' + str(d_0_dist[j]))
+                print('Phash statistical distance: ' + str(d_0_dist[j]))
             if (d_0_dist[j] > self.hash_separation_thr and
                     np.argmax(d_0_dist) == j):
                 card_name = self.reference_images[np.argmin(d_0[:, j])]\
@@ -868,7 +874,7 @@ class MagicCardDetector:
                     break
 
             print('Plotting and saving the results...')
-            test_image.plot_image_with_recognized(self.visual)
+            test_image.plot_image_with_recognized(self.output_path, self.visual)
             print('Done.')
             test_image.print_recognized()
         print('Recognition done.')
@@ -921,21 +927,44 @@ class MagicCardDetector:
 def main():
     """
     Python MTG Card Detector.
-    Example run.
     Can be used also purely through the defined classes.
     """
+
+    # Add command line parser
+    parser = argparse.ArgumentParser(
+        description='Recognize Magic: the Gathering cards from an image. ' +
+                     'Author: Timo Ikonen, timo.ikonen(at)iki.fi')
+
+    parser.add_argument('input_path',
+                        help='path containing the images to be analyzed')
+    parser.add_argument('output_path',
+                        help='output path for the results')
+    parser.add_argument('--phash', default='alpha_reference_phash.dat',
+                        help='pre-calculated phash reference file')
+    parser.add_argument('--visual', default=False, action='store_true',
+                        help='run with visualization')
+    parser.add_argument('--verbose', default=False, action='store_true',
+                        help='run in verbose mode')
+
+    args = parser.parse_args()
+
+    # Create the output path
+    output_path = args.output_path.rstrip('/')
+    if not os.path.exists(output_path):
+        os.mkdir(output_path)
+
     # Instantiate the detector
-    card_detector = MagicCardDetector()
+    card_detector = MagicCardDetector(output_path)
 
     do_profile = False
-    card_detector.visual = True
-    card_detector.verbose = False
+    card_detector.visual = args.visual
+    card_detector.verbose = args.verbose
 
     # Read the reference and test data sets
     # card_detector.read_and_adjust_reference_images(
     #     '../../MTG/Card_Images/LEA/')
-    card_detector.read_prehashed_reference_data('./alpha_reference_phash.dat')
-    card_detector.read_and_adjust_test_images('../MTG_alpha_test_images2/')
+    card_detector.read_prehashed_reference_data(args.phash)
+    card_detector.read_and_adjust_test_images(args.input_path)
 
     if do_profile:
         # Start up the profiler.
@@ -943,12 +972,8 @@ def main():
         profiler.enable()
 
     # Run the card detection and recognition.
-    # 9 = blue aggro
-    # 7 = wizards2
-    # 5 = swamp
-    # 6 = instill energy
 
-    card_detector.run_recognition(6)
+    card_detector.run_recognition()
 
     if do_profile:
         # Stop profiling and organize and print profiling results.
