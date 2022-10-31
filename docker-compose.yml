@@ -1,0 +1,11 @@
+version: '3.7'
+
+services:
+  mtg-inventory:
+    container_name: mtg-inventory
+    build:
+      context: .
+      dockerfile: docker/inventory-system/Dockerfile
+      target: mtg-inventory
+    volumes:
+      - "./:/src:delegated"

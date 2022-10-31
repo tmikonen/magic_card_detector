@@ -1,5 +1,5 @@
 import pickle
-import magic_card_detector as mcg
+import src.magic_card_detector as mcg
 
 
 card_detector = mcg.MagicCardDetector()
