@@ -10,6 +10,5 @@ COPY /requirements/dev.txt requirements.txt
 
 RUN pip install -r requirements.txt
 
-## keep alive
-#CMD ["tail", "-f", "/dev/null"]
-
+# keep alive
+CMD ["tail", "-f", "/dev/null"]

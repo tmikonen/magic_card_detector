@@ -689,7 +689,7 @@ class MagicCardDetector:
             plt.imshow(thresh)
             plt.show()
 
-        _, contours, _ = cv2.findContours(
+        contours, hierarchy = cv2.findContours(
             np.uint8(thresh), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         return contours
 
@@ -939,7 +939,7 @@ def main():
                         help='path containing the images to be analyzed')
     parser.add_argument('output_path',
                         help='output path for the results')
-    parser.add_argument('--phash', default='alpha_reference_phash.dat',
+    parser.add_argument('--phash', default='src/alpha_reference_phash.dat',
                         help='pre-calculated phash reference file')
     parser.add_argument('--visual', default=False, action='store_true',
                         help='run with visualization')
