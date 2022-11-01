@@ -1,15 +1,6 @@
 version: '3.7'
 
 services:
-  mtg-ai-card-detector:
-    container_name: mtg-card-detector
-    build:
-      context: .
-      dockerfile: docker/mtg-card-detector/Dockerfile
-      target: mtg-card-detector
-    volumes:
-      - "./src/card_image_detector/:/src/:delegated"
-
   mtg-inventory-system:
     container_name: mtg-inventory-system
     build:
@@ -19,3 +10,24 @@ services:
       - "./src/mtg_inventory_system/:/src/:delegated"
     ports:
       - "8000:8000"
+    depends_on:
+      - mtg-postgres
+
+  mtg-postgres:
+    container_name: mtg-postgres
+    image: postgres:14.5-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=posty
+    ports:
+      - '5432:5432'
+
+  mtg-ai-card-detector:
+    container_name: mtg-card-detector
+    build:
+      context: .
+      dockerfile: docker/mtg-card-detector/Dockerfile
+      target: mtg-card-detector
+    volumes:
+      - "./src/card_image_detector/:/src/:delegated"
