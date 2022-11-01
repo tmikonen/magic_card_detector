@@ -8,4 +8,14 @@ services:
       dockerfile: docker/mtg-card-detector/Dockerfile
       target: mtg-card-detector
     volumes:
-      - "./:/src/card_image)detector:delegated"
+      - "./src/card_image_detector/:/src/:delegated"
+
+  mtg-inventory-system:
+    container_name: mtg-inventory-system
+    build:
+      context: .
+      dockerfile: docker/inventory-system/Dockerfile
+    volumes:
+      - "./src/mtg_inventory_system/:/src/:delegated"
+    ports:
+      - "8000:8000"
