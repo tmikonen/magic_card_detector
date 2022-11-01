@@ -1,11 +1,11 @@
 version: '3.7'
 
 services:
-  mtg-inventory:
-    container_name: mtg-inventory
+  mtg-ai-card-detector:
+    container_name: mtg-ai-card-detector
     build:
       context: .
-      dockerfile: docker/inventory-system/Dockerfile
-      target: mtg-inventory
+      dockerfile: docker/ai-card-detector/Dockerfile
+      target: mtg-ai-card-detector
     volumes:
       - "./:/src:delegated"

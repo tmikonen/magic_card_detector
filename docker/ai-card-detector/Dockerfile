@@ -1,4 +1,4 @@
-FROM python:3.10.8-slim-buster as mtg-inventory
+FROM python:3.10.8-slim-buster as mtg-ai-card-detector
 
 # installing CV2 dependencies
 RUN apt-get update
