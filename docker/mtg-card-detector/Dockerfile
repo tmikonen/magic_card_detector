@@ -1,4 +1,4 @@
-FROM python:3.10.8-slim-buster as mtg-ai-card-detector
+FROM python:3.10.8-slim-buster as mtg-card-detector
 
 # installing CV2 dependencies
 RUN apt-get update
@@ -11,4 +11,4 @@ COPY /requirements/dev.txt requirements.txt
 RUN pip install -r requirements.txt
 
 # keep alive
-CMD ["tail", "-f", "/dev/null"]
+#CMD ["tail", "-f", "/dev/null"]

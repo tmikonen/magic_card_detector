@@ -939,7 +939,7 @@ def main():
                         help='path containing the images to be analyzed')
     parser.add_argument('output_path',
                         help='output path for the results')
-    parser.add_argument('--phash', default='src/alpha_reference_phash.dat',
+    parser.add_argument('--phash', default='./reference_hashes/alpha_reference_phash.dat',
                         help='pre-calculated phash reference file')
     parser.add_argument('--visual', default=False, action='store_true',
                         help='run with visualization')

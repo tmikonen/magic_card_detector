@@ -1,5 +1,5 @@
 import pickle
-import src.magic_card_detector as mcg
+import src.card_image_detector.magic_card_detector as mcg
 
 
 card_detector = mcg.MagicCardDetector()
@@ -12,5 +12,5 @@ for image in card_detector.reference_images:
     image.adjusted = None
     hlist.append(image)
 
-with open('alpha_reference_phash.dat', 'wb') as f:
+with open('reference_hashes/alpha_reference_phash.dat', 'wb') as f:
     pickle.dump(hlist, f)
