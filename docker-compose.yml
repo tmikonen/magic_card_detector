@@ -1,0 +1,11 @@
+version: '3.7'
+
+services:
+  mtg-ai-card-detector:
+    container_name: mtg-card-detector
+    build:
+      context: .
+      dockerfile: docker/mtg-card-detector/Dockerfile
+      target: mtg-card-detector
+    volumes:
+      - "./:/src/card_image)detector:delegated"
