@@ -17,14 +17,15 @@ services:
     container_name: mtg-postgres
     image: postgres:14.5-alpine
     restart: always
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=posty
+    env_file:
+      - ./src/mtg_inventory_system/mtg_inventory_system/.env
     ports:
-      - '5432:5432'
+      - "${DB_PORT}:5432"
 
   mtg-ai-card-detector:
     container_name: mtg-card-detector
+    env_file:
+      - src/mtg_inventory_system/mtg_inventory_system/.env
     build:
       context: .
       dockerfile: docker/mtg-card-detector/Dockerfile

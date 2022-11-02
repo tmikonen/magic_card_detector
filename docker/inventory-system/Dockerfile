@@ -1,5 +1,8 @@
 FROM python:3.10.8-slim-buster
 
+RUN apt-get update
+RUN apt-get install python3-psycopg2 -y
+
 WORKDIR /src
 
 RUN pip install --upgrade pip
