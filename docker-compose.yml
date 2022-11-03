@@ -20,7 +20,7 @@ services:
     env_file:
       - ./src/mtg_inventory_system/mtg_inventory_system/.env
     ports:
-      - "${DB_PORT}:5432"
+      - "5432:5432"
 
   mtg-ai-card-detector:
     container_name: mtg-card-detector
