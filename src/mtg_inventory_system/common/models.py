@@ -11,6 +11,9 @@ class User(models.Model):
     first_name = models.CharField(max_length=256)
     last_name = models.CharField(max_length=256)
 
+    # TODO: Replace with google OAuth
+    username = models.CharField(max_length=64)
+
     def get_card_library_query_set(self):
         return Card.objects.filter(cardownership__user__id=self.id)
 
