@@ -120,13 +120,22 @@ class CardFace(models.Model):
 
     @classmethod
     def from_scryfall_json(cls, card_face_json):
-        return cls.objects.get_or_create()[0]
+        return cls.objects.get_or_create(
+            name=card_face_json['name'],
+            mana_cost=ManaCost.from_scryfall_json(card_face_json['mana_cost']),
+            power=card_face_json.get('power'),
+            toughness=card_face_json.get('toughness'),
+            type_line=card_face_json['type_line'],
+            oracle_text=card_face_json['oracle_text'],
+            small_img_uri=card_face_json['image_uris']['small'],
+            normal_img_uri=card_face_json['image_uris']['medium'],
+        )[0]
 
 
 class Card(models.Model):
     """Represents a unique card in Magic's printing
     """
-    uuid = models.UUIDField(primary_key=True, editable=False)
+    uuid = models.UUIDField(primary_key=True)
     scryfall_uri = models.URLField()
     scryfall_url = models.URLField()
 
@@ -153,8 +162,15 @@ class Card(models.Model):
         card_faces = card_json.get('card_faces')
 
         if card_faces and len(card_faces) == 2:
-            primary_face = CardFace.from_scryfall_json(card_faces[0])
-            secondary_face = CardFace.from_scryfall_json(card_faces[1])
+            if card_faces[0].get('image_uris'):
+                primary_face = CardFace.from_scryfall_json(card_faces[0])
+                secondary_face = CardFace.from_scryfall_json(card_faces[1])
+            else:
+                card_faces[0]['image_uris'] = card_json['image_uris']
+                card_faces[1]['image_uris'] = card_json['image_uris']
+
+                primary_face = CardFace.from_scryfall_json(card_faces[0])
+                secondary_face = CardFace.from_scryfall_json(card_faces[1])
         elif card_faces and len(card_faces) > 2:
             error_msg = "Cannot create a card {} with {} faces / alternates. url: {}".format(card_json['name'],
                                                                                              len(card_faces),
@@ -250,4 +266,5 @@ class CommanderDeck(Deck):
     """Represents a deck for the commander format
     """
     commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING, related_name='commander')
-    secondary_commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING, null=True, related_name='secondary_commander')
+    secondary_commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING, null=True,
+                                            related_name='secondary_commander')
