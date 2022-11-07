@@ -1,12 +1,15 @@
 import uuid
 
+from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Count, F
 
 from const import CARD_LAYOUT_OPTIONS, PRINTING_TYPE_OPTIONS
 
-
+#####    Non-card related   #####
 class User(models.Model):
+    """Represents a user of the system
+    """
     id = models.UUIDField(primary_key=True, editable=False, default=uuid.uuid4)
     first_name = models.CharField(max_length=256)
     last_name = models.CharField(max_length=256)
@@ -24,7 +27,19 @@ class User(models.Model):
         return self.get_card_library_query_set().annotate(count=Count('unique_string'))
 
 
+#########      Storage    ##########
+class StorageLocation(models.Model):
+    """Model for tracking where cards are stored
+    """
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    name = models.CharField(max_length=100)
+    description = models.CharField(max_length=1000)
+
+
+##########      Cards     ############
 class Set(models.Model):
+    """The set that a card is a part of
+    """
     name = models.CharField(max_length=500)
     scryfall_uuid = models.UUIDField()
 
@@ -58,6 +73,8 @@ class CardFace(models.Model):
 
 
 class Card(models.Model):
+    """Represents a unique card in Magic's printing
+    """
     uuid = models.UUIDField(primary_key=True, editable=False)
     scryfall_uri = models.URLField()
     scryfall_url = models.URLField()
@@ -82,6 +99,8 @@ class Card(models.Model):
 
 
 class CardOwnership(models.Model):
+    """Represents and instance of a card in a user's library. So a user can have multiple copies of the same card
+    """
     # Foreign Relations
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     card = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
@@ -96,5 +115,43 @@ class CardPrice(models.Model):
     """
     date = models.DateField(auto_now_add=True)
     price_usd = models.DecimalField(decimal_places=2)
-    card = models.OneToOneField(Card, on_delete=models.DO_NOTHING)
+    price_tix = models.DecimalField(decimal_places=2)
+    prince_eur = models.DecimalField(decimal_places=2)
+    card = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
+
+
+########      Decks     ############
+class Deck(models.Model):
+    """Represents a constructed Deck
+    """
+    name = models.CharField(max_length=50)
+    user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
+    cards = ArrayField(Card)
+    current_location = models.ForeignKey(StorageLocation, on_delete=models.DO_NOTHING, null=True)
+
+    def is_valid(self):
+        raise NotImplemented
+
+
+class ConstructedDeck(Deck):
+    """Represents a deck for a 60 card constructed format
+    """
+    format_name = models.CharField(max_length=15, choices=[
+        ('Standard', 'standard'),
+        ('Modern', 'modern'),
+        ('Pioneer', 'pioneer'),
+        ('Historic', 'historic'),
+        ('Legacy', 'legacy'),
+        ('Vintage', 'vintage'),
+        ('Pauper', 'pauper'),
+    ])
+    sideboard = ArrayField(Card, size=15)
+
+
+class CommanderDeck(Deck):
+    """Represents a deck for the commander format
+    """
+
+    def is_valid(self):
+        return len(self.cards) == 100
 
