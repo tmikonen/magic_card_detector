@@ -137,8 +137,8 @@ class Card(models.Model):
     printing_type = models.CharField(max_length=10, choices=PRINTING_TYPE_OPTIONS, default='normal')
 
     # Foreign Relations
-    face_primary = models.ForeignKey(CardFace, on_delete=models.CASCADE)
-    face_secondary = models.ForeignKey(CardFace, on_delete=models.CASCADE, null=True)
+    face_primary = models.ForeignKey(CardFace, on_delete=models.CASCADE, related_name='face_primary')
+    face_secondary = models.ForeignKey(CardFace, on_delete=models.CASCADE, null=True, related_name='face_secondary')
     card_set = models.ForeignKey(CardSet, on_delete=models.DO_NOTHING)
 
     class Meta:
@@ -249,5 +249,5 @@ class ConstructedDeck(Deck):
 class CommanderDeck(Deck):
     """Represents a deck for the commander format
     """
-    commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
-    secondary_commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING, null=True)
+    commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING, related_name='commander')
+    secondary_commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING, null=True, related_name='secondary_commander')
