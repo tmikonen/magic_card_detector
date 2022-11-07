@@ -7,7 +7,7 @@ from django.core.exceptions import FieldError
 from django.db import models
 from django.db.models import Count, F
 
-from const import CARD_LAYOUT_OPTIONS, PRINTING_TYPE_OPTIONS
+from common.const import CARD_LAYOUT_OPTIONS, PRINTING_TYPE_OPTIONS
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +53,7 @@ class CardSet(models.Model):
     scryfall_set_cards_uri = models.URLField()
 
 
-class ManaCost(models):
+class ManaCost(models.Model):
     green = models.PositiveSmallIntegerField(null=True, default=None)
     red = models.PositiveSmallIntegerField(null=True, default=None)
     blue = models.PositiveSmallIntegerField(null=True, default=None)
@@ -137,8 +137,8 @@ class Card(models.Model):
     printing_type = models.CharField(max_length=10, choices=PRINTING_TYPE_OPTIONS, default='normal')
 
     # Foreign Relations
-    face_primary = models.OneToOneField(CardFace, on_delete=models.CASCADE)
-    face_secondary = models.OneToOneField(CardFace, on_delete=models.CASCADE, null=True)
+    face_primary = models.ForeignKey(CardFace, on_delete=models.CASCADE)
+    face_secondary = models.ForeignKey(CardFace, on_delete=models.CASCADE, null=True)
     card_set = models.ForeignKey(CardSet, on_delete=models.DO_NOTHING)
 
     class Meta:
@@ -204,17 +204,17 @@ class CardOwnership(models.Model):
     card = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
     date_added = models.DateField(auto_now_add=True)
     date_removed = models.DateField(null=True)
-    price_purchased = models.DecimalField(decimal_places=2)
-    price_sold = models.DecimalField(decimal_places=2, null=True)
+    price_purchased = models.DecimalField(decimal_places=2, max_digits=9)
+    price_sold = models.DecimalField(decimal_places=2, max_digits=9, null=True)
 
 
 class CardPrice(models.Model):
     """Tracks how much a card cost in USD on a certain day
     """
     date = models.DateField(auto_now_add=True)
-    price_usd = models.DecimalField(decimal_places=2)
-    price_tix = models.DecimalField(decimal_places=2)
-    prince_eur = models.DecimalField(decimal_places=2)
+    price_usd = models.DecimalField(decimal_places=2, max_digits=9)
+    price_tix = models.DecimalField(decimal_places=2, max_digits=9)
+    prince_eur = models.DecimalField(decimal_places=2, max_digits=9)
     card = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
 
 
@@ -224,7 +224,7 @@ class Deck(models.Model):
     """
     name = models.CharField(max_length=50)
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
-    cards = ArrayField(Card)
+    cards = models.ManyToManyField(Card)
     current_location = models.ForeignKey(StorageLocation, on_delete=models.DO_NOTHING, null=True)
 
     def is_valid(self):
@@ -243,7 +243,7 @@ class ConstructedDeck(Deck):
         ('Vintage', 'vintage'),
         ('Pauper', 'pauper'),
     ])
-    sideboard = ArrayField(Card, size=15)
+    sideboard = models.ManyToManyField(Card)
 
 
 class CommanderDeck(Deck):
@@ -251,6 +251,3 @@ class CommanderDeck(Deck):
     """
     commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
     secondary_commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING, null=True)
-
-    def is_valid(self):
-        return len(self.cards) == 100
