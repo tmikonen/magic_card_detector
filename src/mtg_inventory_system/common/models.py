@@ -1,10 +1,16 @@
+import re
 import uuid
+import logging
 
 from django.contrib.postgres.fields import ArrayField
+from django.core.exceptions import FieldError
 from django.db import models
 from django.db.models import Count, F
 
 from const import CARD_LAYOUT_OPTIONS, PRINTING_TYPE_OPTIONS
+
+logger = logging.getLogger(__name__)
+
 
 #####    Non-card related   #####
 class User(models.Model):
@@ -37,11 +43,14 @@ class StorageLocation(models.Model):
 
 
 ##########      Cards     ############
-class Set(models.Model):
+class CardSet(models.Model):
     """The set that a card is a part of
     """
+    scryfall_uuid = models.UUIDField(primary_key=True)
     name = models.CharField(max_length=500)
-    scryfall_uuid = models.UUIDField()
+    symbol = models.CharField(max_length=8)
+    scryfall_uri = models.URLField()
+    scryfall_set_cards_uri = models.URLField()
 
 
 class ManaCost(models):
@@ -52,9 +61,47 @@ class ManaCost(models):
     white = models.PositiveSmallIntegerField(null=True, default=None)
     colourless = models.PositiveSmallIntegerField(null=True, default=None)
     x_mana = models.BooleanField(default=False)
+    other = models.BooleanField(default=False)
 
     class Meta:
         unique_together = ('green', 'red', 'blue', 'black', 'white', 'colourless')
+
+    @classmethod
+    def from_scryfall_json(cls, mana_json_string):
+        mana = {
+            'G': 0,
+            'R': 0,
+            'U': 0,
+            'B': 0,
+            'W': 0,
+            'un_col': 0,
+            'X': 0,
+        }
+
+        mana_regex = r'\{[1-9A-Z]\}'
+        alt_mana_regex = r'\{B/P\}'
+        mana_breakdown = re.findall(mana_regex, mana_json_string)
+        alt_mana_breakdown = re.findall(alt_mana_regex, mana_json_string)
+
+        for mana in mana_breakdown:
+            symbol = mana.replace('{', "").replace("}", "")
+            try:
+                un_col = int(symbol)
+                mana['un_col'] = un_col
+            except TypeError:
+                num = mana.get(symbol) or 0
+                mana[symbol] = num + 1
+
+        return cls.objects.get_or_create(
+            green=mana.get('G'),
+            red=mana.get('R'),
+            blue=mana.get('U'),
+            black=mana.get('B'),
+            white=mana.get('W'),
+            colourless=mana.get('un_col'),
+            x_mana=mana.get('x') is not None,
+            other=len(alt_mana_breakdown) > 0,
+        )[0]
 
 
 class CardFace(models.Model):
@@ -71,6 +118,10 @@ class CardFace(models.Model):
     small_img_uri = models.URLField()
     normal_img_uri = models.URLField()
 
+    @classmethod
+    def from_scryfall_json(cls, card_face_json):
+        return cls.objects.get_or_create()[0]
+
 
 class Card(models.Model):
     """Represents a unique card in Magic's printing
@@ -83,12 +134,12 @@ class Card(models.Model):
     name = models.CharField(max_length=500)
 
     conv_mana_cost = models.PositiveSmallIntegerField()
-    printing_type = models.CharField(max_length=10, choices=PRINTING_TYPE_OPTIONS)
+    printing_type = models.CharField(max_length=10, choices=PRINTING_TYPE_OPTIONS, default='normal')
 
     # Foreign Relations
     face_primary = models.OneToOneField(CardFace, on_delete=models.CASCADE)
     face_secondary = models.OneToOneField(CardFace, on_delete=models.CASCADE, null=True)
-    set = models.ForeignKey(Set, on_delete=models.DO_NOTHING)
+    card_set = models.ForeignKey(CardSet, on_delete=models.DO_NOTHING)
 
     class Meta:
         unique_together = ('uuid', 'printing_type')
@@ -96,6 +147,53 @@ class Card(models.Model):
     @property
     def unique_string(self):
         return "{} {}".format(self.uuid, self.printing_type)
+
+    @classmethod
+    def from_scryfall_json(cls, card_json):
+        card_faces = card_json.get('card_faces')
+
+        if card_faces and len(card_faces) == 2:
+            primary_face = CardFace.from_scryfall_json(card_faces[0])
+            secondary_face = CardFace.from_scryfall_json(card_faces[1])
+        elif card_faces and len(card_faces) > 2:
+            error_msg = "Cannot create a card {} with {} faces / alternates. url: {}".format(card_json['name'],
+                                                                                             len(card_faces),
+                                                                                             card_json['url'])
+            logger.error(error_msg)
+            raise FieldError(error_msg)
+        else:
+            mana_cost = ManaCost.from_scryfall_json(card_json['mana_cost'])
+            primary_face = CardFace.objects.get_or_create(
+                name=card_json['name'],
+                mana_cost=mana_cost,
+                power=card_json.get('power'),
+                toughness=card_json.get('power'),
+                type_line=card_json['type_line'],
+                oracle_text=card_json['oracle_text'],
+                small_img_uri=card_json['image_uris']['small'],
+                normal_img_uri=card_json['image_uris']['normal'],
+            )[0]
+            secondary_face = None
+
+        card_set = CardSet.objects.get_or_create(
+            scryfall_uuid=card_json['set_id'],
+            name=card_json['set_name'],
+            symbol=card_json['set'],
+            scryfall_uri=card_json['set_uri'],
+            scryfall_set_cards_uri=card_json['set_search_uri'],
+        )[0]
+
+        return cls.objects.get_or_create(
+            uuid=card_json['id'],
+            scryfall_uri=card_json['uri'],
+            scryfall_url=card_json['scryfall_uri'],
+            layout=card_json['layout'],
+            name=card_json['name'],
+            conv_mana_cost=int(card_json['cmc']),
+            face_primary=primary_face,
+            face_secondary=secondary_face,
+            card_set=card_set,
+        )[0]
 
 
 class CardOwnership(models.Model):
@@ -151,7 +249,8 @@ class ConstructedDeck(Deck):
 class CommanderDeck(Deck):
     """Represents a deck for the commander format
     """
+    commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
+    secondary_commander = models.ForeignKey(Card, on_delete=models.DO_NOTHING, null=True)
 
     def is_valid(self):
         return len(self.cards) == 100
-
