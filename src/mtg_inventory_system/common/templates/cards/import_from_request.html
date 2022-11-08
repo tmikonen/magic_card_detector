@@ -1,0 +1,13 @@
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'cards/style.css' %}">
+
+<form action="{% url 'run_import' %}" method="post">
+{% csrf_token %}
+
+    <legend><h1>Import cards from Scryfall call</h1></legend>
+    <input type="text" id="url" name="scryfall_url">
+    <label>Scryfall URL</label><br>
+
+<input type="submit" value="Import">
+</form>

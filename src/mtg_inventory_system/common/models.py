@@ -68,27 +68,19 @@ class ManaCost(models.Model):
 
     @classmethod
     def from_scryfall_json(cls, mana_json_string):
-        mana = {
-            'G': 0,
-            'R': 0,
-            'U': 0,
-            'B': 0,
-            'W': 0,
-            'un_col': 0,
-            'X': 0,
-        }
+        mana = {}
 
         mana_regex = r'\{[1-9A-Z]\}'
         alt_mana_regex = r'\{B/P\}'
         mana_breakdown = re.findall(mana_regex, mana_json_string)
         alt_mana_breakdown = re.findall(alt_mana_regex, mana_json_string)
 
-        for mana in mana_breakdown:
-            symbol = mana.replace('{', "").replace("}", "")
+        for mana_sym in mana_breakdown:
+            symbol = mana_sym.replace('{', "").replace("}", "")
             try:
                 un_col = int(symbol)
                 mana['un_col'] = un_col
-            except TypeError:
+            except ValueError:
                 num = mana.get(symbol) or 0
                 mana[symbol] = num + 1
 
@@ -128,7 +120,7 @@ class CardFace(models.Model):
             type_line=card_face_json['type_line'],
             oracle_text=card_face_json['oracle_text'],
             small_img_uri=card_face_json['image_uris']['small'],
-            normal_img_uri=card_face_json['image_uris']['medium'],
+            normal_img_uri=card_face_json['image_uris']['normal'],
         )[0]
 
 
