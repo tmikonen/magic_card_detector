@@ -7,7 +7,7 @@ from django.core.exceptions import FieldError
 from django.db import models
 from django.db.models import Count, F
 
-from common.const import CARD_LAYOUT_OPTIONS, PRINTING_TYPE_OPTIONS
+from .const import CARD_LAYOUT_OPTIONS, PRINTING_TYPE_OPTIONS
 
 logger = logging.getLogger(__name__)
 

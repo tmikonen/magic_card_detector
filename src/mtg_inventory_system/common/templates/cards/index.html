@@ -1,0 +1,24 @@
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'cards/style.css' %}">
+
+{% if all_cards %}
+    <ul>
+    {% for card in all_cards %}
+        <div class="card_row">
+          <div class="card_column">
+              <img src="{{ card.face_primary.small_img_uri }}" alt="{{ card.name }}">
+          </div>
+          <div class="card_column">
+              <p>Card Name: {{ card.name }}</p>
+              <p>Card Set: {{ card.set_name }}</p>
+              <li><a href={{ card.scryfall_url }}>Scryfall Link</a></li>
+              <li><a href="/cards/{{ card.uuid }}">More Details</a></li>
+          </div>
+        </div>
+        <hr>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No cards are available.</p>
+{% endif %}
