@@ -67,7 +67,7 @@ class ManaCost(models.Model):
         unique_together = ('green', 'red', 'blue', 'black', 'white', 'colourless')
 
     @classmethod
-    def from_scryfall_json(cls, mana_json_string):
+    def get_or_create_from_scryfall_json(cls, mana_json_string):
         mana = {}
 
         mana_regex = r'\{[1-9A-Z]\}'
@@ -111,10 +111,10 @@ class CardFace(models.Model):
     normal_img_uri = models.URLField()
 
     @classmethod
-    def from_scryfall_json(cls, card_face_json):
+    def get_or_create_from_scryfall_json(cls, card_face_json):
         return cls.objects.get_or_create(
             name=card_face_json['name'],
-            mana_cost=ManaCost.from_scryfall_json(card_face_json['mana_cost']),
+            mana_cost=ManaCost.get_or_create_from_scryfall_json(card_face_json['mana_cost']),
             power=card_face_json.get('power'),
             toughness=card_face_json.get('toughness'),
             type_line=card_face_json['type_line'],
@@ -150,19 +150,19 @@ class Card(models.Model):
         return "{} {}".format(self.uuid, self.printing_type)
 
     @classmethod
-    def from_scryfall_json(cls, card_json):
+    def get_or_create_from_scryfall_json(cls, card_json):
         card_faces = card_json.get('card_faces')
 
         if card_faces and len(card_faces) == 2:
             if card_faces[0].get('image_uris'):
-                primary_face = CardFace.from_scryfall_json(card_faces[0])
-                secondary_face = CardFace.from_scryfall_json(card_faces[1])
+                primary_face = CardFace.get_or_create_from_scryfall_json(card_faces[0])
+                secondary_face = CardFace.get_or_create_from_scryfall_json(card_faces[1])
             else:
                 card_faces[0]['image_uris'] = card_json['image_uris']
                 card_faces[1]['image_uris'] = card_json['image_uris']
 
-                primary_face = CardFace.from_scryfall_json(card_faces[0])
-                secondary_face = CardFace.from_scryfall_json(card_faces[1])
+                primary_face = CardFace.get_or_create_from_scryfall_json(card_faces[0])
+                secondary_face = CardFace.get_or_create_from_scryfall_json(card_faces[1])
         elif card_faces and len(card_faces) > 2:
             error_msg = "Cannot create a card {} with {} faces / alternates. url: {}".format(card_json['name'],
                                                                                              len(card_faces),
@@ -170,7 +170,7 @@ class Card(models.Model):
             logger.error(error_msg)
             raise FieldError(error_msg)
         else:
-            mana_cost = ManaCost.from_scryfall_json(card_json['mana_cost'])
+            mana_cost = ManaCost.get_or_create_from_scryfall_json(card_json['mana_cost'])
             primary_face = CardFace.objects.get_or_create(
                 name=card_json['name'],
                 mana_cost=mana_cost,

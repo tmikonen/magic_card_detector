@@ -54,7 +54,7 @@ def run_import(req):
         return HttpResponseRedirect(reverse(cards))
 
     for card_data in card_json:
-        Card.from_scryfall_json(card_data)
+        Card.get_or_create_from_scryfall_json(card_data)
 
     return HttpResponseRedirect(reverse(cards))
 
