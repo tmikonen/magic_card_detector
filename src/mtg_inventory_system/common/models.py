@@ -6,7 +6,6 @@ import logging
 from django.core.exceptions import FieldError
 from django.db import models
 from django.db.models import Count, F
-from django.utils.timezone import now
 
 from .const import CARD_LAYOUT_OPTIONS, PRINTING_TYPE_OPTIONS
 
@@ -99,8 +98,12 @@ class ManaCost(models.Model):
     @classmethod
     def get_or_create_from_scryfall_json(cls, mana_json_string):
         args_dict = cls._parse_scryfall_json_to_model_args(mana_json_string)
-
         return cls.objects.get_or_create(**args_dict)[0]
+
+    @classmethod
+    def update_or_create_from_scryfall_json(cls, mana_json_string):
+        args_dict = cls._parse_scryfall_json_to_model_args(mana_json_string)
+        return cls.objects.update_or_create(**args_dict)[0]
 
 
 class CardFace(models.Model):
@@ -134,6 +137,11 @@ class CardFace(models.Model):
     def get_or_create_from_scryfall_json(cls, card_face_json):
         args_dict = cls._parse_scryfall_json_to_model_args(card_face_json)
         return cls.objects.get_or_create(**args_dict)[0]
+
+    @classmethod
+    def update_or_create_from_scryfall_json(cls, card_face_json):
+        args_dict = cls._parse_scryfall_json_to_model_args(card_face_json)
+        return cls.objects.update_or_create(**args_dict)[0]
 
 
 class Card(models.Model):
@@ -224,6 +232,11 @@ class Card(models.Model):
     def get_or_create_from_scryfall_json(cls, card_json):
         args_dict = cls._parse_scryfall_json_to_model_args(card_json)
         return cls.objects.get_or_create(**args_dict)[0]
+
+    @classmethod
+    def update_or_create_from_scryfall_json(cls, card_json):
+        args_dict = cls._parse_scryfall_json_to_model_args(card_json)
+        return cls.objects.update_or_create(**args_dict)[0]
 
 
 class CardOwnership(models.Model):
