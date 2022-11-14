@@ -1,11 +1,12 @@
+import datetime
 import re
 import uuid
 import logging
 
-from django.contrib.postgres.fields import ArrayField
 from django.core.exceptions import FieldError
 from django.db import models
 from django.db.models import Count, F
+from django.utils.timezone import now
 
 from .const import CARD_LAYOUT_OPTIONS, PRINTING_TYPE_OPTIONS
 
@@ -148,6 +149,10 @@ class Card(models.Model):
     conv_mana_cost = models.PositiveSmallIntegerField()
     printing_type = models.CharField(max_length=10, choices=PRINTING_TYPE_OPTIONS, default='normal')
 
+    release_at = models.DateField(default=datetime.date(year=1993, month=9, day=1))
+    time_added_to_db = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(auto_now=True)
+
     # Foreign Relations
     face_primary = models.ForeignKey(CardFace, on_delete=models.CASCADE, related_name='face_primary')
     face_secondary = models.ForeignKey(CardFace, on_delete=models.CASCADE, null=True, related_name='face_secondary')
@@ -208,6 +213,7 @@ class Card(models.Model):
             'scryfall_url': card_json['scryfall_uri'],
             'layout': card_json['layout'],
             'name': card_json['name'],
+            'released_at': card_json['released_at'],
             'conv_mana_cost': int(card_json['cmc']),
             'face_primary': primary_face,
             'face_secondary': secondary_face,
