@@ -66,8 +66,8 @@ class ManaCost(models.Model):
     class Meta:
         unique_together = ('green', 'red', 'blue', 'black', 'white', 'colourless')
 
-    @classmethod
-    def get_or_create_from_scryfall_json(cls, mana_json_string):
+    @staticmethod
+    def _parse_scryfall_json_to_model_args(mana_json_string):
         mana = {}
 
         mana_regex = r'\{[1-9A-Z]\}'
@@ -84,16 +84,22 @@ class ManaCost(models.Model):
                 num = mana.get(symbol) or 0
                 mana[symbol] = num + 1
 
-        return cls.objects.get_or_create(
-            green=mana.get('G'),
-            red=mana.get('R'),
-            blue=mana.get('U'),
-            black=mana.get('B'),
-            white=mana.get('W'),
-            colourless=mana.get('un_col'),
-            x_mana=mana.get('x') is not None,
-            other=len(alt_mana_breakdown) > 0,
-        )[0]
+        return {
+            'green': mana.get('G'),
+            'red': mana.get('R'),
+            'blue': mana.get('U'),
+            'black': mana.get('B'),
+            'white': mana.get('W'),
+            'colourless': mana.get('un_col'),
+            'x_mana': mana.get('x') is not None,
+            'other': len(alt_mana_breakdown) > 0,
+        }
+
+    @classmethod
+    def get_or_create_from_scryfall_json(cls, mana_json_string):
+        args_dict = cls._parse_scryfall_json_to_model_args(mana_json_string)
+
+        return cls.objects.get_or_create(**args_dict)[0]
 
 
 class CardFace(models.Model):
@@ -110,18 +116,23 @@ class CardFace(models.Model):
     small_img_uri = models.URLField()
     normal_img_uri = models.URLField()
 
+    @staticmethod
+    def _parse_scryfall_json_to_model_args(card_face_json):
+        return {
+            'name': card_face_json['name'],
+            'mana_cost': ManaCost.get_or_create_from_scryfall_json(card_face_json['mana_cost']),
+            'power': card_face_json.get('power'),
+            'toughness': card_face_json.get('toughness'),
+            'type_line': card_face_json['type_line'],
+            'oracle_text': card_face_json['oracle_text'],
+            'small_img_uri': card_face_json['image_uris']['small'],
+            'normal_img_uri': card_face_json['image_uris']['normal'],
+        }
+
     @classmethod
     def get_or_create_from_scryfall_json(cls, card_face_json):
-        return cls.objects.get_or_create(
-            name=card_face_json['name'],
-            mana_cost=ManaCost.get_or_create_from_scryfall_json(card_face_json['mana_cost']),
-            power=card_face_json.get('power'),
-            toughness=card_face_json.get('toughness'),
-            type_line=card_face_json['type_line'],
-            oracle_text=card_face_json['oracle_text'],
-            small_img_uri=card_face_json['image_uris']['small'],
-            normal_img_uri=card_face_json['image_uris']['normal'],
-        )[0]
+        args_dict = cls._parse_scryfall_json_to_model_args(card_face_json)
+        return cls.objects.get_or_create(**args_dict)[0]
 
 
 class Card(models.Model):
@@ -148,9 +159,9 @@ class Card(models.Model):
     @property
     def unique_string(self):
         return "{} {}".format(self.uuid, self.printing_type)
-
-    @classmethod
-    def get_or_create_from_scryfall_json(cls, card_json):
+    
+    @staticmethod
+    def _parse_scryfall_json_to_model_args(card_json):
         card_faces = card_json.get('card_faces')
 
         if card_faces and len(card_faces) == 2:
@@ -191,17 +202,22 @@ class Card(models.Model):
             scryfall_set_cards_uri=card_json['set_search_uri'],
         )[0]
 
-        return cls.objects.get_or_create(
-            uuid=card_json['id'],
-            scryfall_uri=card_json['uri'],
-            scryfall_url=card_json['scryfall_uri'],
-            layout=card_json['layout'],
-            name=card_json['name'],
-            conv_mana_cost=int(card_json['cmc']),
-            face_primary=primary_face,
-            face_secondary=secondary_face,
-            card_set=card_set,
-        )[0]
+        return {
+            'uuid': card_json['id'],
+            'scryfall_uri': card_json['uri'],
+            'scryfall_url': card_json['scryfall_uri'],
+            'layout': card_json['layout'],
+            'name': card_json['name'],
+            'conv_mana_cost': int(card_json['cmc']),
+            'face_primary': primary_face,
+            'face_secondary': secondary_face,
+            'card_set': card_set,
+        }
+
+    @classmethod
+    def get_or_create_from_scryfall_json(cls, card_json):
+        args_dict = cls._parse_scryfall_json_to_model_args(card_json)
+        return cls.objects.get_or_create(**args_dict)[0]
 
 
 class CardOwnership(models.Model):
