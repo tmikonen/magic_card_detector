@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 class Command(BaseCommand):
     help = 'Gets bulk data from Scryfall and updates the Card Database'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--max-cards', type=int)
+
     def handle(self, *args, **options):
         t1 = time.time()
         request_url = 'https://api.scryfall.com/bulk-data'
@@ -42,11 +45,12 @@ class Command(BaseCommand):
                     logger.debug(json.dumps(all_cards_json[0:4], indent=3))
 
                     num = 0
+                    max_cards = options.get('max_cards', len(all_cards_json))
                     for card_json in all_cards_json:
-                        if num < 100:
+
+                        if num < max_cards:
                             try:
                                 card_obj, created = Card.update_or_create_from_scryfall_json(card_json)
-
                                 logger.info(f'{num} {"Created" if created else "Updated"} card {str(card_obj)}')
                             except Exception as e:
                                 logger.error(f'{num} Failed to create card {card_json["name"]} because {str(e)}')
