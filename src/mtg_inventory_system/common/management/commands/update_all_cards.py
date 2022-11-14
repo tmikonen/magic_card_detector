@@ -10,6 +10,7 @@ from ...models import Card
 logger = logging.getLogger(__name__)
 
 
+# V1: basic update and create time for 76,116 cards
 class Command(BaseCommand):
     help = 'Gets bulk data from Scryfall and updates the Card Database'
 
@@ -41,19 +42,25 @@ class Command(BaseCommand):
 
                 if bulk_card_request.status_code == 200:
                     all_cards_json = json.loads(bulk_card_request.text)
-                    logger.info(f'{len(all_cards_json):,} cards found')
+                    total_cards = len(all_cards_json)
+                    logger.info(f'{total_cards:,} cards found')
                     logger.debug(json.dumps(all_cards_json[0:4], indent=3))
 
-                    num = 0
-                    max_cards = options.get('max_cards', len(all_cards_json))
+                    num = 1
+                    max_cards = options.get('max_cards') or total_cards
+                    logger.info(f'Creating or updating {max_cards:,} cards')
+                    justify_width = len(f'{max_cards:,}')
+                    fail = "\033[91mFAILED"
+                    create = "\033[92mCREATED"
+                    update = "\033[96mUPDATED"
                     for card_json in all_cards_json:
-
-                        if num < max_cards:
+                        if num <= max_cards:
                             try:
                                 card_obj, created = Card.update_or_create_from_scryfall_json(card_json)
-                                logger.info(f'{num} {"Created" if created else "Updated"} card {str(card_obj)}')
+                                logger.info(f'\033[1m{num: >{justify_width},}\033[0m of {max_cards:,} {create if created else update: <10} card {str(card_obj)}\033[0m')
                             except Exception as e:
-                                logger.error(f'{num} Failed to create card {card_json["name"]} because {str(e)}')
+                                err_str = str(e).replace("\n", "   |   ")
+                                logger.error(f'\033[1m{num: >{justify_width},}\033[0m of {max_cards:,} {fail: <10} to create card {card_json["name"]} because {err_str}\033[0m')
                             num += 1
                         else:
                             break
