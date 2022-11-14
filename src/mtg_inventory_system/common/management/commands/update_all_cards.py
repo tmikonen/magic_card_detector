@@ -5,7 +5,7 @@ import time
 import requests
 from django.core.management.base import BaseCommand, CommandError
 
-from src.mtg_inventory_system.common.models import Card
+from ...models import Card
 
 logger = logging.getLogger(__name__)
 

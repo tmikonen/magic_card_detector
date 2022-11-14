@@ -126,7 +126,7 @@ class CardFace(models.Model):
     def _parse_scryfall_json_to_model_args(card_face_json):
         return {
             'name': card_face_json['name'],
-            'mana_cost': ManaCost.get_or_create_from_scryfall_json(card_face_json['mana_cost']),
+            'mana_cost': ManaCost.get_or_create_from_scryfall_json(card_face_json['mana_cost'])[0],
             'power': card_face_json.get('power'),
             'toughness': card_face_json.get('toughness'),
             'type_line': card_face_json['type_line'],
