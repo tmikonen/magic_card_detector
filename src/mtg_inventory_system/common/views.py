@@ -1,5 +1,7 @@
 import json
 import logging
+import time
+
 import requests
 
 from django.db.models import F, Q
@@ -7,6 +9,7 @@ from django.shortcuts import render
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader
 from django.urls import reverse
+from urllib.parse import urlencode
 
 from .models import Card
 
@@ -57,6 +60,3 @@ def run_import(req):
         Card.get_or_create_from_scryfall_json(card_data)
 
     return HttpResponseRedirect(reverse(cards))
-
-
-

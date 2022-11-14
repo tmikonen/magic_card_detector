@@ -7,5 +7,5 @@ urlpatterns = [
     path('cards/', views.cards, name='list cards'),
     path('card/<str:card_uuid>/', views.card, name='card details'),
     path('import_cards/', views.import_cards_from_url, name='import cards'),
-    path('run_import/', views.run_import, name='run_import')
+    path('run_import/', views.run_import, name='run_import'),
 ]
