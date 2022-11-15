@@ -111,36 +111,40 @@ class ManaCost(models.Model):
 class CardFace(models.Model):
     """Sometimes MTG cards can have more than one face tied to it. This represents that data
     """
-    name = models.CharField(max_length=128)
+    name = models.CharField(max_length=256)
     mana_cost = models.ForeignKey(ManaCost, on_delete=models.DO_NOTHING, null=True, default=None)
 
     power = models.SmallIntegerField(null=True)
     toughness = models.SmallIntegerField(null=True)
 
-    type_line = models.CharField(max_length=100)
-    oracle_text = models.CharField(max_length=500)
+    type_line = models.CharField(max_length=256, null=True)
+    oracle_text = models.CharField(max_length=1500, null=True)
     small_img_uri = models.URLField(null=True)
     normal_img_uri = models.URLField(null=True)
 
     @staticmethod
     def _parse_scryfall_json_to_model_args(card_face_json):
-        try:
-            toughness = int(card_face_json.get('toughness'))
-        except ValueError:
-            toughness = -1
+        toughness = card_face_json.get('toughness')
+        if toughness:
+            try:
+                toughness = int(toughness)
+            except ValueError:
+                toughness = -1
 
-        try:
-            power = int(card_face_json.get('power'))
-        except ValueError:
-            power = -1
+        power = card_face_json.get('power')
+        if power:
+            try:
+                power = int(power)
+            except ValueError:
+                power = -1
 
         return {
             'name': card_face_json['name'],
             'mana_cost': ManaCost.get_or_create_from_scryfall_json(card_face_json['mana_cost'])[0],
             'power': power,
             'toughness': toughness,
-            'type_line': card_face_json['type_line'],
-            'oracle_text': card_face_json['oracle_text'],
+            'type_line': card_face_json.get('type_line'),
+            'oracle_text': card_face_json.get('oracle_text'),
             'small_img_uri': card_face_json.get('image_uris').get('small'),
             'normal_img_uri': card_face_json.get('image_uris').get('normal'),
         }
@@ -194,8 +198,8 @@ class Card(models.Model):
 
         if card_faces and len(card_faces) == 2:
             if not card_faces[0].get('image_uris'):
-                card_faces[0]['image_uris'] = card_json['image_uris']
-                card_faces[1]['image_uris'] = card_json['image_uris']
+                card_faces[0]['image_uris'] = card_json.get('image_uris', {})
+                card_faces[1]['image_uris'] = card_json.get('image_uris', {})
 
             primary_face_json = CardFace._parse_scryfall_json_to_model_args(card_faces[0])
             secondary_face_json = CardFace._parse_scryfall_json_to_model_args(card_faces[1])
@@ -223,20 +227,24 @@ class Card(models.Model):
         elif card_faces and len(card_faces) > 2:
             error_msg = "Cannot create a card {} with {} faces / alternates. url: {}".format(card_json['name'],
                                                                                              len(card_faces),
-                                                                                             card_json['url'])
+                                                                                             card_json['scryfall_uri'])
             logger.error(error_msg)
-            raise FieldError(error_msg)
+            return
         else:
             mana_cost = ManaCost.get_or_create_from_scryfall_json(card_json['mana_cost'])[0]
-            try:
-                toughness = int(card_json.get('toughness'))
-            except ValueError:
-                toughness = -1
+            toughness = card_json.get('toughness')
+            if toughness:
+                try:
+                    toughness = int(toughness)
+                except ValueError:
+                    toughness = -1
 
-            try:
-                power = int(card_json.get('power'))
-            except ValueError:
-                power = -1
+            power = card_json.get('power')
+            if power:
+                try:
+                    power = int(power)
+                except ValueError:
+                    power = -1
 
             primary_face = CardFace.objects.get_or_create(
                 name=card_json['name'],
@@ -265,7 +273,7 @@ class Card(models.Model):
             'layout': card_json['layout'],
             'name': card_json['name'],
             'released_at': card_json['released_at'],
-            'conv_mana_cost': int(card_json['cmc']),
+            'conv_mana_cost': int(card_json.get('cmc', 0)),
             'face_primary': primary_face,
             'face_secondary': secondary_face,
             'card_set': card_set,
@@ -276,14 +284,16 @@ class Card(models.Model):
         json_with_objs = Card._parse_scryfall_json_to_model_args(card_json)
         json_to_return = {}
 
-        for key, value in json_with_objs.items():
-            if isinstance(value, models.Model):
-                new_key = "{}__id".format(key)
-                json_to_return[new_key] = value.pk
-            else:
-                json_to_return[key] = value
+        if json_with_objs:
+            for key, value in json_with_objs.items():
+                if isinstance(value, models.Model):
+                    new_key = "{}_id".format(key)
+                    json_to_return[new_key] = value.pk
+                else:
+                    json_to_return[key] = value
 
         return json_to_return
+
 
     @classmethod
     def get_or_create_from_scryfall_json(cls, card_json):

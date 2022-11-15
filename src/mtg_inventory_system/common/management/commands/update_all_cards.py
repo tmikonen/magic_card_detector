@@ -56,7 +56,7 @@ class Command(BaseCommand):
 
                     card_ids_to_json = {j['id']: j for j in all_cards_json}
                     imported_ids = set(card_ids_to_json.keys())
-                    current_ids = set(str(c['uuid']) for c in Card.objects.values('uuid'))
+                    current_ids = set(str(c['id']) for c in Card.objects.values('id'))
 
                     ids_to_create = list(imported_ids.difference(current_ids))
                     ids_to_update = list(imported_ids.difference(ids_to_create))
@@ -97,9 +97,10 @@ def abulk_create(card_ids_to_json, ids_to_create):
 
 
 def abulk_update(card_ids_to_json, ids_to_update):
+    fields_to_update = []
     objects = [
         Card(
             **Card.get_raw_json_for_bulk_operations(card_ids_to_json[card_uuid])
         ) for card_uuid in ids_to_update
     ]
-    Card.objects.abulk_update(objects)
+    Card.objects.abulk_update(objects, fields_to_update)
