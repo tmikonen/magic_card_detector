@@ -53,17 +53,28 @@ class Command(BaseCommand):
                     fail = "\033[91mFAILED"
                     create = "\033[92mCREATED"
                     update = "\033[96mUPDATED"
-                    for card_json in all_cards_json:
-                        if num <= max_cards:
-                            try:
-                                card_obj, created = Card.update_or_create_from_scryfall_json(card_json)
-                                logger.info(f'\033[1m{num: >{justify_width},}\033[0m of {max_cards:,} {create if created else update: <10} card {str(card_obj)}\033[0m')
-                            except Exception as e:
-                                err_str = str(e).replace("\n", "   |   ")
-                                logger.error(f'\033[1m{num: >{justify_width},}\033[0m of {max_cards:,} {fail: <10} to create card {card_json["name"]} because {err_str}\033[0m')
-                            num += 1
-                        else:
-                            break
+
+                    card_ids_to_json = {j['id']: j for j in all_cards_json}
+                    imported_ids = set(card_ids_to_json.keys())
+                    current_ids = set(str(c['uuid']) for c in Card.objects.values('uuid'))
+
+                    ids_to_create = list(imported_ids.difference(current_ids))
+                    ids_to_update = list(imported_ids.difference(ids_to_create))
+
+                    abulk_create(card_ids_to_json, ids_to_create)
+                    abulk_update(card_ids_to_json, ids_to_update)
+
+                    # for card_json in all_cards_json:
+                    #     if num <= max_cards:
+                    #         try:
+                    #             card_obj, created = Card.update_or_create_from_scryfall_json(card_json)
+                    #             logger.info(f'\033[1m{num: >{justify_width},}\033[0m of {max_cards:,} {create if created else update: <10} card {str(card_obj)}\033[0m')
+                    #         except Exception as e:
+                    #             err_str = str(e).replace("\n", "   |   ")
+                    #             logger.error(f'\033[1m{num: >{justify_width},}\033[0m of {max_cards:,} {fail: <10} to create card {card_json["name"]} because {err_str}\033[0m')
+                    #         num += 1
+                    #     else:
+                    #         break
 
                     t3 = time.time()
                     logger.info(f'time to update all cards {(t3 - t2) // 60} mins {(t3 - t2) % 60} secs')
@@ -74,3 +85,21 @@ class Command(BaseCommand):
 
         t4 = time.time()
         logger.info(f'Time to get and update all cards {(t4 - t1) // 60} mins {(t4 - t1) % 60} secs')
+
+
+def abulk_create(card_ids_to_json, ids_to_create):
+    objects = [
+        Card(
+            **Card.get_raw_json_for_bulk_operations(card_ids_to_json[card_uuid])
+        ) for card_uuid in ids_to_create
+    ]
+    Card.objects.abulk_create(objects)
+
+
+def abulk_update(card_ids_to_json, ids_to_update):
+    objects = [
+        Card(
+            **Card.get_raw_json_for_bulk_operations(card_ids_to_json[card_uuid])
+        ) for card_uuid in ids_to_update
+    ]
+    Card.objects.abulk_update(objects)

@@ -46,7 +46,7 @@ class StorageLocation(models.Model):
 class CardSet(models.Model):
     """The set that a card is a part of
     """
-    scryfall_uuid = models.UUIDField(primary_key=True)
+    id = models.UUIDField(primary_key=True)
     name = models.CharField(max_length=500)
     symbol = models.CharField(max_length=8)
     set_type = models.CharField(max_length=20)
@@ -119,20 +119,30 @@ class CardFace(models.Model):
 
     type_line = models.CharField(max_length=100)
     oracle_text = models.CharField(max_length=500)
-    small_img_uri = models.URLField()
-    normal_img_uri = models.URLField()
+    small_img_uri = models.URLField(null=True)
+    normal_img_uri = models.URLField(null=True)
 
     @staticmethod
     def _parse_scryfall_json_to_model_args(card_face_json):
+        try:
+            toughness = int(card_face_json.get('toughness'))
+        except ValueError:
+            toughness = -1
+
+        try:
+            power = int(card_face_json.get('power'))
+        except ValueError:
+            power = -1
+
         return {
             'name': card_face_json['name'],
             'mana_cost': ManaCost.get_or_create_from_scryfall_json(card_face_json['mana_cost'])[0],
-            'power': card_face_json.get('power'),
-            'toughness': card_face_json.get('toughness'),
+            'power': power,
+            'toughness': toughness,
             'type_line': card_face_json['type_line'],
             'oracle_text': card_face_json['oracle_text'],
-            'small_img_uri': card_face_json['image_uris']['small'],
-            'normal_img_uri': card_face_json['image_uris']['normal'],
+            'small_img_uri': card_face_json.get('image_uris').get('small'),
+            'normal_img_uri': card_face_json.get('image_uris').get('normal'),
         }
 
     @classmethod
@@ -149,7 +159,7 @@ class CardFace(models.Model):
 class Card(models.Model):
     """Represents a unique card in Magic's printing
     """
-    uuid = models.UUIDField(primary_key=True)
+    id = models.UUIDField(primary_key=True)
     scryfall_uri = models.URLField()
     scryfall_url = models.URLField()
 
@@ -169,14 +179,14 @@ class Card(models.Model):
     card_set = models.ForeignKey(CardSet, on_delete=models.DO_NOTHING)
 
     class Meta:
-        unique_together = ('uuid', 'printing_type')
+        unique_together = ('id', 'printing_type')
 
     def __str__(self):
         return f'{self.name} - {self.printing_type} - {self.card_set.name}'
 
     @property
     def unique_string(self):
-        return "{} {}".format(self.uuid, self.printing_type)
+        return "{} {}".format(self.id, self.printing_type)
     
     @staticmethod
     def _parse_scryfall_json_to_model_args(card_json):
@@ -218,11 +228,21 @@ class Card(models.Model):
             raise FieldError(error_msg)
         else:
             mana_cost = ManaCost.get_or_create_from_scryfall_json(card_json['mana_cost'])[0]
+            try:
+                toughness = int(card_json.get('toughness'))
+            except ValueError:
+                toughness = -1
+
+            try:
+                power = int(card_json.get('power'))
+            except ValueError:
+                power = -1
+
             primary_face = CardFace.objects.get_or_create(
                 name=card_json['name'],
                 mana_cost=mana_cost,
-                power=card_json.get('power'),
-                toughness=card_json.get('toughness'),
+                power=power,
+                toughness=toughness,
                 type_line=card_json['type_line'],
                 oracle_text=card_json['oracle_text'],
                 small_img_uri=card_json['image_uris']['small'],
@@ -231,7 +251,7 @@ class Card(models.Model):
             secondary_face = None
 
         card_set = CardSet.objects.get_or_create(
-            scryfall_uuid=card_json['set_id'],
+            id=card_json['set_id'],
             name=card_json['set_name'],
             symbol=card_json['set'],
             scryfall_uri=card_json['set_uri'],
@@ -239,7 +259,7 @@ class Card(models.Model):
         )[0]
 
         return {
-            'uuid': card_json['id'],
+            'id': card_json['id'],
             'scryfall_uri': card_json['uri'],
             'scryfall_url': card_json['scryfall_uri'],
             'layout': card_json['layout'],
@@ -250,6 +270,20 @@ class Card(models.Model):
             'face_secondary': secondary_face,
             'card_set': card_set,
         }
+
+    @staticmethod
+    def get_raw_json_for_bulk_operations(card_json):
+        json_with_objs = Card._parse_scryfall_json_to_model_args(card_json)
+        json_to_return = {}
+
+        for key, value in json_with_objs.items():
+            if isinstance(value, models.Model):
+                new_key = "{}__id".format(key)
+                json_to_return[new_key] = value.pk
+            else:
+                json_to_return[key] = value
+
+        return json_to_return
 
     @classmethod
     def get_or_create_from_scryfall_json(cls, card_json):
