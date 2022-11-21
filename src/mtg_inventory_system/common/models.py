@@ -108,58 +108,6 @@ class ManaCost(models.Model):
         return cls.objects.update_or_create(**args_dict)
 
 
-class CardFace(models.Model):
-    """Sometimes MTG cards can have more than one face tied to it. This represents that data
-    """
-    name = models.CharField(max_length=256)
-    mana_cost = models.ForeignKey(ManaCost, on_delete=models.DO_NOTHING, null=True, default=None)
-
-    power = models.SmallIntegerField(null=True)
-    toughness = models.SmallIntegerField(null=True)
-
-    type_line = models.CharField(max_length=256, null=True)
-    oracle_text = models.CharField(max_length=1500, null=True)
-    small_img_uri = models.URLField(null=True)
-    normal_img_uri = models.URLField(null=True)
-
-    @staticmethod
-    def _parse_scryfall_json_to_model_args(card_face_json):
-        toughness = card_face_json.get('toughness')
-        if toughness:
-            try:
-                toughness = int(toughness)
-            except ValueError:
-                toughness = -1
-
-        power = card_face_json.get('power')
-        if power:
-            try:
-                power = int(power)
-            except ValueError:
-                power = -1
-
-        return {
-            'name': card_face_json['name'],
-            'mana_cost': ManaCost.get_or_create_from_scryfall_json(card_face_json['mana_cost'])[0],
-            'power': power,
-            'toughness': toughness,
-            'type_line': card_face_json.get('type_line'),
-            'oracle_text': card_face_json.get('oracle_text'),
-            'small_img_uri': card_face_json.get('image_uris').get('small'),
-            'normal_img_uri': card_face_json.get('image_uris').get('normal'),
-        }
-
-    @classmethod
-    def get_or_create_from_scryfall_json(cls, card_face_json):
-        args_dict = cls._parse_scryfall_json_to_model_args(card_face_json)
-        return cls.objects.get_or_create(**args_dict)
-
-    @classmethod
-    def update_or_create_from_scryfall_json(cls, card_face_json):
-        args_dict = cls._parse_scryfall_json_to_model_args(card_face_json)
-        return cls.objects.update_or_create(**args_dict)
-
-
 class Card(models.Model):
     """Represents a unique card in Magic's printing
     """
@@ -178,8 +126,6 @@ class Card(models.Model):
     last_updated = models.DateTimeField(auto_now=True)
 
     # Foreign Relations
-    face_primary = models.ForeignKey(CardFace, on_delete=models.CASCADE, related_name='face_primary')
-    face_secondary = models.ForeignKey(CardFace, on_delete=models.CASCADE, null=True, related_name='face_secondary')
     card_set = models.ForeignKey(CardSet, on_delete=models.DO_NOTHING)
 
     class Meta:
@@ -303,6 +249,60 @@ class Card(models.Model):
     @classmethod
     def update_or_create_from_scryfall_json(cls, card_json):
         args_dict = cls._parse_scryfall_json_to_model_args(card_json)
+        return cls.objects.update_or_create(**args_dict)
+
+
+class CardFace(models.Model):
+    """Sometimes MTG cards can have more than one face tied to it. This represents that data
+    """
+    name = models.CharField(max_length=256)
+    mana_cost = models.ForeignKey(ManaCost, on_delete=models.DO_NOTHING, null=True, default=None)
+
+    power = models.SmallIntegerField(null=True)
+    toughness = models.SmallIntegerField(null=True)
+
+    type_line = models.CharField(max_length=256, null=True)
+    oracle_text = models.CharField(max_length=1500, null=True)
+    small_img_uri = models.URLField(null=True)
+    normal_img_uri = models.URLField(null=True)
+
+    card = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
+
+    @staticmethod
+    def _parse_scryfall_json_to_model_args(card_face_json):
+        toughness = card_face_json.get('toughness')
+        if toughness:
+            try:
+                toughness = int(toughness)
+            except ValueError:
+                toughness = -1
+
+        power = card_face_json.get('power')
+        if power:
+            try:
+                power = int(power)
+            except ValueError:
+                power = -1
+
+        return {
+            'name': card_face_json['name'],
+            'mana_cost': ManaCost.get_or_create_from_scryfall_json(card_face_json['mana_cost'])[0],
+            'power': power,
+            'toughness': toughness,
+            'type_line': card_face_json.get('type_line'),
+            'oracle_text': card_face_json.get('oracle_text'),
+            'small_img_uri': card_face_json.get('image_uris').get('small'),
+            'normal_img_uri': card_face_json.get('image_uris').get('normal'),
+        }
+
+    @classmethod
+    def get_or_create_from_scryfall_json(cls, card_face_json):
+        args_dict = cls._parse_scryfall_json_to_model_args(card_face_json)
+        return cls.objects.get_or_create(**args_dict)
+
+    @classmethod
+    def update_or_create_from_scryfall_json(cls, card_face_json):
+        args_dict = cls._parse_scryfall_json_to_model_args(card_face_json)
         return cls.objects.update_or_create(**args_dict)
 
 
