@@ -22,13 +22,13 @@ services:
     ports:
       - "5432:5432"
 
-  mtg-ai-card-detector:
-    container_name: mtg-card-detector
-    env_file:
-      - src/mtg_inventory_system/mtg_inventory_system/.env
-    build:
-      context: .
-      dockerfile: docker/mtg-card-detector/Dockerfile
-      target: mtg-card-detector
-    volumes:
-      - "./src/card_image_detector/:/src/:delegated"
+#  mtg-ai-card-detector:
+#    container_name: mtg-card-detector
+#    env_file:
+#      - src/mtg_inventory_system/mtg_inventory_system/.env
+#    build:
+#      context: .
+#      dockerfile: docker/mtg-card-detector/Dockerfile
+#      target: mtg-card-detector
+#    volumes:
+#      - "./src/card_image_detector/:/src/:delegated"
