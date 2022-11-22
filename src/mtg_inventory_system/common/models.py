@@ -119,7 +119,6 @@ class Card(models.Model):
     name = models.CharField(max_length=500)
 
     conv_mana_cost = models.PositiveSmallIntegerField()
-    printing_type = models.CharField(max_length=10, choices=PRINTING_TYPE_OPTIONS, default='normal')
 
     released_at = models.DateField(default=datetime.date(year=1993, month=9, day=1))
     time_added_to_db = models.DateTimeField(auto_now_add=True)
@@ -128,15 +127,12 @@ class Card(models.Model):
     # Foreign Relations
     card_set = models.ForeignKey(CardSet, on_delete=models.DO_NOTHING)
 
-    class Meta:
-        unique_together = ('id', 'printing_type')
-
     def __str__(self):
-        return f'{self.name} - {self.printing_type} - {self.card_set.name}'
+        return f'{self.name} - {self.card_set.name}'
 
     @property
     def unique_string(self):
-        return "{} {}".format(self.id, self.printing_type)
+        return str(self.id)
     
     @staticmethod
     def _parse_scryfall_json_to_model_args(card_json):
@@ -312,6 +308,7 @@ class CardOwnership(models.Model):
     # Foreign Relations
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)
     card = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
+    printing_type = models.CharField(max_length=10, choices=PRINTING_TYPE_OPTIONS, default='normal')
     date_added = models.DateField(auto_now_add=True)
     date_removed = models.DateField(null=True)
     price_purchased = models.DecimalField(decimal_places=2, max_digits=9)
@@ -326,6 +323,7 @@ class CardPrice(models.Model):
     price_tix = models.DecimalField(decimal_places=2, max_digits=9)
     prince_eur = models.DecimalField(decimal_places=2, max_digits=9)
     card = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
+    printing_type = models.CharField(max_length=10, choices=PRINTING_TYPE_OPTIONS, default='normal')
 
 
 ########      Decks     ############
