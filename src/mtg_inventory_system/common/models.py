@@ -135,79 +135,7 @@ class Card(models.Model):
         return str(self.id)
 
     @staticmethod
-    def _parse_scryfall_json_to_model_args(card_json):
-        # card_faces = card_json.get('card_faces')
-        #
-        # if card_faces and len(card_faces) == 2:
-        #     if not card_faces[0].get('image_uris'):
-        #         card_faces[0]['image_uris'] = card_json.get('image_uris', {})
-        #         card_faces[1]['image_uris'] = card_json.get('image_uris', {})
-        #
-        #     primary_face_json = CardFace._parse_scryfall_json_to_model_args(card_faces[0])
-        #     secondary_face_json = CardFace._parse_scryfall_json_to_model_args(card_faces[1])
-        #
-        #     primary_face = CardFace.objects.get_or_create(
-        #         name=primary_face_json['name'],
-        #         mana_cost=primary_face_json['mana_cost'],
-        #         power=primary_face_json['power'],
-        #         toughness=primary_face_json['toughness'],
-        #         type_line=primary_face_json['type_line'],
-        #         oracle_text=primary_face_json['oracle_text'],
-        #         small_img_uri=primary_face_json['small_img_uri'],
-        #         normal_img_uri=primary_face_json['normal_img_uri'],
-        #     )[0]
-        #     secondary_face = CardFace.objects.get_or_create(
-        #         name=secondary_face_json['name'],
-        #         mana_cost=secondary_face_json['mana_cost'],
-        #         power=secondary_face_json['power'],
-        #         toughness=secondary_face_json['toughness'],
-        #         type_line=secondary_face_json['type_line'],
-        #         oracle_text=secondary_face_json['oracle_text'],
-        #         small_img_uri=secondary_face_json['small_img_uri'],
-        #         normal_img_uri=secondary_face_json['normal_img_uri'],
-        #     )[0]
-        # elif card_faces and len(card_faces) > 2:
-        #     error_msg = "Cannot create a card {} with {} faces / alternates. url: {}".format(card_json['name'],
-        #                                                                                      len(card_faces),
-        #                                                                                      card_json['scryfall_uri'])
-        #     logger.error(error_msg)
-        #     return
-        # else:
-        #     mana_cost = ManaCost.get_or_create_from_scryfall_json(card_json['mana_cost'])[0]
-        #     toughness = card_json.get('toughness')
-        #     if toughness:
-        #         try:
-        #             toughness = int(toughness)
-        #         except ValueError:
-        #             toughness = -1
-        #
-        #     power = card_json.get('power')
-        #     if power:
-        #         try:
-        #             power = int(power)
-        #         except ValueError:
-        #             power = -1
-        #
-        #     primary_face = CardFace.objects.get_or_create(
-        #         name=card_json['name'],
-        #         mana_cost=mana_cost,
-        #         power=power,
-        #         toughness=toughness,
-        #         type_line=card_json['type_line'],
-        #         oracle_text=card_json['oracle_text'],
-        #         small_img_uri=card_json['image_uris']['small'],
-        #         normal_img_uri=card_json['image_uris']['normal'],
-        #     )[0]
-        #     secondary_face = None
-
-        card_set = CardSet.objects.get_or_create(
-            id=card_json['set_id'],
-            name=card_json['set_name'],
-            symbol=card_json['set'],
-            scryfall_uri=card_json['set_uri'],
-            scryfall_set_cards_uri=card_json['set_search_uri'],
-        )[0]
-
+    def get_raw_json_for_bulk_operations(card_json):
         return {
             'id': card_json['id'],
             'scryfall_uri': card_json['uri'],
@@ -216,34 +144,17 @@ class Card(models.Model):
             'name': card_json['name'],
             'released_at': card_json['released_at'],
             'conv_mana_cost': int(card_json.get('cmc', 0)),
-            'face_primary': primary_face,
-            'face_secondary': secondary_face,
-            'card_set': card_set,
+            'card_set_id': card_json['set_id'],
         }
-
-    @staticmethod
-    def get_raw_json_for_bulk_operations(card_json):
-        json_with_objs = Card._parse_scryfall_json_to_model_args(card_json)
-        json_to_return = {}
-
-        if json_with_objs:
-            for key, value in json_with_objs.items():
-                if isinstance(value, models.Model):
-                    new_key = "{}_id".format(key)
-                    json_to_return[new_key] = value.pk
-                else:
-                    json_to_return[key] = value
-
-        return json_to_return
 
     @classmethod
     def get_or_create_from_scryfall_json(cls, card_json):
-        args_dict = cls._parse_scryfall_json_to_model_args(card_json)
+        args_dict = cls.get_raw_json_for_bulk_operations(card_json)
         return cls.objects.get_or_create(**args_dict)
 
     @classmethod
     def update_or_create_from_scryfall_json(cls, card_json):
-        args_dict = cls._parse_scryfall_json_to_model_args(card_json)
+        args_dict = cls.get_raw_json_for_bulk_operations(card_json)
         return cls.objects.update_or_create(**args_dict)
 
 
