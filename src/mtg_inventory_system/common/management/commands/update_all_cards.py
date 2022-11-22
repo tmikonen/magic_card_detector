@@ -4,7 +4,12 @@ import time
 
 from django.core.management.base import BaseCommand, CommandError
 
-from ..utils import get_card_bulk_data, get_set_data, map_ids_to_data, parse_ids_to_create_and_update
+from ..utils import \
+    get_card_bulk_data, \
+    get_set_data, \
+    map_ids_to_data, \
+    parse_ids_to_create_and_update, \
+    timer
 from ...models import Card, CardFace, CardSet
 
 logger = logging.getLogger(__name__)
@@ -18,62 +23,75 @@ class Command(BaseCommand):
         parser.add_argument('--batch-size', type=int)
 
     def handle(self, *args, **options):
-        t1 = time.time()
-        all_cards_json = get_card_bulk_data()
-        all_sets_json = get_set_data()
-        t2 = time.time()
+        with timer() as t:
+            all_cards_json = get_card_bulk_data()
+            all_sets_json = get_set_data()
+        print(f"Time to get remote data: {t():.4f} secs")
 
         total_cards = len(all_cards_json)
+        total_sets = len(all_sets_json)
         logger.info(f'{total_cards:,} cards found')
+        logger.info(f'{total_sets:,} sets found')
 
         # finding out which sets to update and which sets to create
-        set_ids_to_json, imported_set_ids = map_ids_to_data(all_sets_json)
-        set_ids_to_create, set_ids_to_update = parse_ids_to_create_and_update(CardSet, imported_set_ids)
+        logger.info(f'Mapping Sets to ids')
+        with timer() as t:
+            set_ids_to_json, imported_set_ids = map_ids_to_data(all_sets_json)
+            set_ids_to_create, set_ids_to_update = parse_ids_to_create_and_update(CardSet, imported_set_ids)
+            logger.info(f'Found {len(set_ids_to_create)} sets to create and {len(set_ids_to_update)} sets to update')
+        print(f"Time to parse set data: {t():.4f} secs")
 
         # finding out which cards to update and which cards to create
-        card_ids_to_json, imported_card_ids = map_ids_to_data(all_cards_json)
-        card_ids_to_create, card_ids_to_update = parse_ids_to_create_and_update(Card, imported_card_ids)
+        logger.info(f'Mapping Cards to ids')
+        with timer() as t:
+            card_ids_to_json, imported_card_ids = map_ids_to_data(all_cards_json)
+            card_ids_to_create, card_ids_to_update = parse_ids_to_create_and_update(Card, imported_card_ids)
+            logger.info(f'Found {len(card_ids_to_create)} cards to create and {len(card_ids_to_update)} cards to update')
+        print(f"Time to parse card data: {t():.4f} secs")
+
+        # parsing out card face data
+        # TODO: The keys will overide for multi face cards so need to do something else
+        logger.info(f'Mapping Cards to ids')
+        with timer() as t:
+            card_face_data = []
+            for card_data in all_cards_json:
+                card_face_data += CardFace.get_raw_json_for_bulk_operations(card_data)
+            card_ids_to_card_face_json, _ = map_ids_to_data(card_face_data, id_name='card_id')
+            logger.info(f'Found {len(card_ids_to_create)} cards to create and {len(card_ids_to_update)} cards to update')
+        print(f"Time to parse card data: {t():.4f} secs")
 
         # bulk update or create sets
-
-
-        # bulk update or create card faces
-
+        general_bulk_update_or_create(
+            CardSet,
+            set_ids_to_json,
+            set_ids_to_update,
+            set_ids_to_create
+        )
 
         # bulk update or create cards
+        general_bulk_update_or_create(
+            Card,
+            card_ids_to_json,
+            card_ids_to_update,
+            card_ids_to_create
+        )
 
-        num = 1
-        logger.info(f'Creating or updating {total_cards:,} cards')
-        justify_width = len(f'{total_cards:,}')
-        fail = "\033[91mFAILED"
-        create = "\033[92mCREATED"
-        update = "\033[96mUPDATED"
-
-        abulk_create_cards(card_ids_to_json, ids_to_create)
-        abulk_update_cards(card_ids_to_json, ids_to_update)
-
-        t3 = time.time()
-        logger.info(f'time to update all cards {(t3 - t2) // 60} mins {(t3 - t2) % 60} secs')
-
-        t4 = time.time()
-        logger.info(f'Time to get and update all cards {(t4 - t1) // 60} mins {(t4 - t1) % 60} secs')
+        # bulk update or create card faces
+        general_bulk_update_or_create(
+            Card,
+            card_ids_to_card_face_json,
+            card_ids_to_update,
+            card_ids_to_create
+        )
 
 
-def abulk_create_cards(card_ids_to_json, ids_to_create):
-    objects = [
-        Card(
-            **Card.get_raw_json_for_bulk_operations(card_ids_to_json[card_uuid])
-        ) for card_uuid in ids_to_create
-    ]
-    Card.objects.abulk_create(objects)
-
-
-def abulk_update_cards(card_ids_to_json, ids_to_update):
-    fields_to_update = []
-    objects = [
-        Card(
-            **Card.get_raw_json_for_bulk_operations(card_ids_to_json[card_uuid])
-        ) for card_uuid in ids_to_update
-    ]
-    Card.objects.abulk_update(objects, fields_to_update)
+def general_bulk_update_or_create(obj_class, ids_to_data_mapping, ids_to_update, ids_to_create):
+    obj_class.objects.bulk_update([
+        obj_class.get_raw_json_for_bulk_operations(ids_to_data_mapping[update_id]) for
+        update_id in ids_to_update
+    ])
+    obj_class.objects.bulk_create([
+        obj_class.get_raw_json_for_bulk_operations(ids_to_data_mapping[create_id]) for
+        create_id in ids_to_create
+    ])
 

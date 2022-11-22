@@ -3,6 +3,9 @@ import logging
 
 import requests
 
+from time import perf_counter
+from contextlib import contextmanager
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,17 +50,23 @@ def get_set_data():
     return []
 
 
-def map_ids_to_data(json_data):
-    ids_to_json = {j['id']: j for j in json_data}
+def map_ids_to_data(json_data, id_name='id'):
+    ids_to_json = {j[id_name]: j for j in json_data}
     imported_ids = set(ids_to_json.keys())
 
     return ids_to_json, imported_ids
 
 
-def parse_ids_to_create_and_update(obj_class, imported_ids):
-    current_ids = set(str(c['id']) for c in obj_class.objects.values('id'))
+def parse_ids_to_create_and_update(obj_class, imported_ids, id_name='id'):
+    current_ids = set(str(c[id_name]) for c in obj_class.objects.values(id_name))
 
     ids_to_create = list(imported_ids.difference(current_ids))
     ids_to_update = list(imported_ids.difference(ids_to_create))
 
     return ids_to_create, ids_to_update
+
+
+@contextmanager
+def timer() -> float:
+    start = perf_counter()
+    yield lambda: perf_counter() - start
