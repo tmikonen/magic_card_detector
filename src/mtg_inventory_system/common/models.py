@@ -54,6 +54,18 @@ class CardSet(models.Model):
     scryfall_set_cards_uri = models.URLField()
     icon_uri = models.URLField(null=True)
 
+    @staticmethod
+    def get_raw_json_for_bulk_operations(set_json):
+        return {
+            'id': set_json['id'],
+            'name': set_json['name'],
+            'symbol': set_json['code'],
+            'set_type': set_json['set_type'],
+            'scryfall_uri': set_json['scryfall_uri'],
+            'scryfall_set_cards_uri': set_json['search_uri'],
+            'icon_uri': set_json['icon_svg_uri'],
+        }
+
 
 class ManaCost(models.Model):
     green = models.PositiveSmallIntegerField(null=True, default=None)
@@ -248,14 +260,14 @@ class CardFace(models.Model):
         return card_face_args
 
     @classmethod
-    def get_or_create_from_scryfall_json(cls, card_face_json):
-        args_dict = cls._parse_scryfall_json_to_model_args(card_face_json)
-        return cls.objects.get_or_create(**args_dict)
+    def get_or_create_from_scryfall_json(cls, card_json):
+        args_dict_list = cls.get_raw_json_for_bulk_operations(card_json)
+        return [cls.objects.get_or_create(**args_dict) for args_dict in args_dict_list]
 
     @classmethod
-    def update_or_create_from_scryfall_json(cls, card_face_json):
-        args_dict = cls._parse_scryfall_json_to_model_args(card_face_json)
-        return cls.objects.update_or_create(**args_dict)
+    def update_or_create_from_scryfall_json(cls, card_json):
+        args_dict_list = cls.get_raw_json_for_bulk_operations(card_json)
+        return [cls.objects.update_or_create(**args_dict) for args_dict in args_dict_list]
 
 
 class CardOwnership(models.Model):
