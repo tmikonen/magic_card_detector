@@ -3,6 +3,7 @@ import logging
 import time
 
 import requests
+from django.core.paginator import Paginator
 
 from django.db.models import F, Q
 from django.shortcuts import render
@@ -21,13 +22,13 @@ def index(req):
 
 
 def cards(req):
-    all_cards = Card.objects.all().annotate(set_name=F('card_set__name'))
-    template = loader.get_template('cards/index.html')
-    context = {
-        'all_cards': all_cards,
-    }
+    all_cards = Card.objects.all().annotate(set_name=F('card_set__name')).order_by('name')
+    card_paginator = Paginator(all_cards, 25)
 
-    return HttpResponse(template.render(context, req))
+    page = req.GET.get('page') or 1
+    page_obj = card_paginator.get_page(page)
+
+    return render(req, 'cards/list.html', {'page_obj': page_obj})
 
 
 def card(req, card_uuid):
