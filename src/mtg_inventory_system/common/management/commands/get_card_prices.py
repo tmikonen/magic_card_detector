@@ -1,7 +1,7 @@
 import datetime
 import logging
 
-from django.core.exceptions import ObjectDoesNotExist
+from django.core.exceptions import ObjectDoesNotExist, MultipleObjectsReturned
 from django.core.management.base import BaseCommand
 
 from ..utils import \
@@ -29,6 +29,7 @@ class Command(BaseCommand):
         # find if we have already got the price data for today
         try:
             CardPrice.objects.get(date=today)
+        except MultipleObjectsReturned:
             logger.info('Already have card price data for today')
             return
         except ObjectDoesNotExist:
