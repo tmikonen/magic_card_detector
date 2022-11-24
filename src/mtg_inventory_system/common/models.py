@@ -307,42 +307,21 @@ class CardPrice(models.Model):
     price_eur = models.DecimalField(decimal_places=2, max_digits=9, null=True)
     price_eur_foil = models.DecimalField(decimal_places=2, max_digits=9, null=True)
     card = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
-    # printing_type = models.CharField(max_length=10, choices=PRINTING_TYPE_OPTIONS, default='normal')
 
     @staticmethod
     def get_raw_json_for_bulk_operations(card_json, date_string):
         price_json = card_json['prices']
-        price_args = []
         return \
             {
                 'date': date_string,
                 'card_id': card_json['id'],
-                # 'printing_type': print_type,
-                **price_json
+                'price_usd': price_json['usd'],
+                'price_usd_foil': price_json['usd_foil'],
+                'price_usd_etched': price_json['usd_etched'],
+                'price_tix': price_json['tix'],
+                'price_eur': price_json['eur'],
+                'price_eur_foil': price_json['eur_foil']
             }
-
-        # for _, print_type in PRINTING_TYPE_OPTIONS:
-        #     tmp_args = {
-        #         'date': date_string,
-        #         'card_id': card_json['id'],
-        #         'printing_type': print_type,
-        #     }
-        #     if print_type == 'normal':
-        #         tmp_args['price_usd'] = price_json['usd']
-        #         tmp_args['price_tix'] = price_json['tix']
-        #         tmp_args['price_eur'] = price_json['eur']
-        #     else:
-        #         if \
-        #                 price_json.get('usd_{}'.format(print_type)) or \
-        #                 price_json.get('tix_{}'.format(print_type)) or \
-        #                 price_json.get('eur_{}'.format(print_type)):
-        #             tmp_args['price_usd'] = price_json.get('usd_{}'.format(print_type)) or None
-        #             tmp_args['price_tix'] = price_json.get('tix_{}'.format(print_type)) or None
-        #             tmp_args['price_eur'] = price_json.get('eur_{}'.format(print_type)) or None
-        #
-        #     price_args.append(tmp_args)
-        #
-        # return price_args
 
 
 ########      Decks     ############

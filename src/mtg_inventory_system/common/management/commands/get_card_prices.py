@@ -45,9 +45,10 @@ class Command(BaseCommand):
         # Parsing out the card price data
         logger.info(f'Parsing out the card price data')
         with timer() as t:
-            card_prices = []
-            for card_json in all_cards_json:
-                card_prices += CardPrice.get_raw_json_for_bulk_operations(card_json, date_string=today_str)
+            card_prices = [
+                CardPrice.get_raw_json_for_bulk_operations(card_json, date_string=today_str)
+                for card_json in all_cards_json
+            ]
         print(f"Time to parse {len(card_prices):,} card prices: {t():.4f} secs")
 
         # creating the card prices
