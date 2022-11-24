@@ -1,8 +1,6 @@
-import json
 import logging
-import time
 
-from django.core.management.base import BaseCommand, CommandError
+from django.core.management.base import BaseCommand
 
 from ..utils import \
     get_card_bulk_data, \
@@ -13,6 +11,7 @@ from ..utils import \
 from ...models import Card, CardFace, CardSet
 
 logger = logging.getLogger(__name__)
+
 
 class Command(BaseCommand):
     help = 'Gets bulk data from Scryfall and creates new objects in the Card Database. ' \
@@ -89,7 +88,7 @@ class Command(BaseCommand):
             )
         print(f"Time to create Card Sets: {t():.4f} secs")
 
-        # bulk update or create cards
+        # bulk create cards
         logger.info(f'Creating {len(card_ids_to_create):,} Cards in batches of {batch_size:,}')
         with timer() as t:
             general_bulk_create(
@@ -100,7 +99,7 @@ class Command(BaseCommand):
             )
         print(f"Time to create Cards: {t():.4f} secs")
 
-        # bulk update or create card faces
+        # bulk create card faces
         logger.info(f'Creating {len(card_faces_to_create):,} Card Faces in batches of {batch_size:,}')
         with timer() as t:
             CardFace.objects.bulk_create(card_faces_to_create, batch_size=batch_size)
