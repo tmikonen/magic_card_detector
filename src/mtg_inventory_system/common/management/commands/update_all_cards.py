@@ -69,6 +69,7 @@ class Command(BaseCommand):
                 if count % 1000 == 0:
                     logger.info(f'Parsed faces from {count:,} / {total_cards:,} cards')
 
+            logger.info(f'Parsed faces from {count:,} / {total_cards:,} cards')
             face_fields_to_update = CardFace.non_id_fields()
             logger.info(f'Found {len(card_faces_to_create):,} card faces to create and {len(card_faces_to_update):,} card faces to update')
         print(f"Time to parse card face data: {t():.4f} secs")
