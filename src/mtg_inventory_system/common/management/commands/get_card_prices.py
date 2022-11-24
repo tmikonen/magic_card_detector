@@ -6,11 +6,8 @@ from django.core.management.base import BaseCommand
 
 from ..utils import \
     get_card_bulk_data, \
-    get_set_data, \
-    map_ids_to_data, \
-    parse_ids_to_create_and_update, \
     timer
-from ...models import Card, CardFace, CardSet, CardPrice
+from ...models import CardPrice
 
 logger = logging.getLogger(__name__)
 
