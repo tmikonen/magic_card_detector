@@ -14,13 +14,14 @@ from ...models import Card, CardFace, CardSet
 
 logger = logging.getLogger(__name__)
 
-
-# V1: basic update and create time for 76,116 cards
 class Command(BaseCommand):
-    help = 'Gets bulk data from Scryfall and updates the Card Database'
+    help = 'Gets bulk data from Scryfall and creates new objects in the Card Database. ' \
+           '\n\tIf --update-and-create is specified, card data will also be updated'
 
     def add_arguments(self, parser):
         parser.add_argument('--batch-size', type=int)
+
+        parser.add_argument('--update-and-create', type=bool)
 
     def handle(self, *args, **options):
         with timer() as t:
@@ -76,41 +77,78 @@ class Command(BaseCommand):
 
         batch_size = options.get('batch_size') or 10000
 
-        # bulk update or create sets
-        logger.info(f'Updating and Creating Card Sets in batches of {batch_size:,}')
+        # creating new objects
+        # bulk create sets
+        logger.info(f'Creating {len(set_ids_to_create):,} Card Sets in batches of {batch_size:,}')
         with timer() as t:
-            general_bulk_update_or_create(
+            general_bulk_create(
                 CardSet,
                 set_ids_to_json,
-                set_ids_to_update,
                 set_ids_to_create,
-                set_fields_to_update,
                 batch_size
             )
-        print(f"Time to update or create Card Sets: {t():.4f} secs")
+        print(f"Time to create Card Sets: {t():.4f} secs")
 
         # bulk update or create cards
-        logger.info(f'Updating and Creating Cards in batches of {batch_size:,}')
+        logger.info(f'Creating {len(card_ids_to_create):,} Cards in batches of {batch_size:,}')
         with timer() as t:
-            general_bulk_update_or_create(
+            general_bulk_create(
                 Card,
                 card_ids_to_json,
-                card_ids_to_update,
                 card_ids_to_create,
-                card_fields_to_update,
                 batch_size
             )
-        print(f"Time to update or create Cards: {t():.4f} secs")
+        print(f"Time to create Cards: {t():.4f} secs")
 
         # bulk update or create card faces
-        logger.info(f'Updating and Creating Card Faces in batches of {batch_size:,}')
+        logger.info(f'Creating {len(card_faces_to_create):,} Card Faces in batches of {batch_size:,}')
         with timer() as t:
-            CardFace.objects.bulk_update(card_faces_to_update, face_fields_to_update, batch_size=batch_size)
             CardFace.objects.bulk_create(card_faces_to_create, batch_size=batch_size)
-        print(f"Time to update or create Card Faces: {t():.4f} secs")
+        print(f"Time to create Card Faces: {t():.4f} secs")
+
+        if options.get('update_and_create'):
+            # bulk update
+            logger.info(f'Updating {len(set_ids_to_update):,} Card Sets in batches of {batch_size:,}')
+            with timer() as t:
+                general_bulk_update(
+                    CardSet,
+                    set_ids_to_json,
+                    set_ids_to_update,
+                    set_fields_to_update,
+                    batch_size
+                )
+            print(f"Time to update Card Sets: {t():.4f} secs")
+
+            # bulk update or create cards
+            logger.info(f'Updating {len(card_ids_to_update):,} Cards in batches of {batch_size:,}')
+            with timer() as t:
+                general_bulk_update(
+                    Card,
+                    card_ids_to_json,
+                    card_ids_to_update,
+                    card_fields_to_update,
+                    batch_size
+                )
+            print(f"Time to update Cards: {t():.4f} secs")
+
+            # bulk update or create card faces
+            logger.info(f'Updating {len(card_faces_to_update):,} Card Faces in batches of {batch_size:,}')
+            with timer() as t:
+                CardFace.objects.bulk_update(card_faces_to_update, face_fields_to_update, batch_size=batch_size)
+            print(f"Time to update Card Faces: {t():.4f} secs")
 
 
-def general_bulk_update_or_create(obj_class, ids_to_data_mapping, ids_to_update, ids_to_create, fields_to_update, batch_size):
+def general_bulk_create(obj_class, ids_to_data_mapping, ids_to_create, batch_size):
+    obj_class.objects.bulk_create(
+        [
+            obj_class(**obj_class.get_raw_json_for_bulk_operations(ids_to_data_mapping[create_id])) for
+            create_id in ids_to_create
+        ],
+        batch_size=batch_size
+    )
+
+
+def general_bulk_update(obj_class, ids_to_data_mapping, ids_to_update, fields_to_update, batch_size):
     obj_class.objects.bulk_update(
         [
             obj_class(**obj_class.get_raw_json_for_bulk_operations(ids_to_data_mapping[update_id])) for
@@ -120,11 +158,8 @@ def general_bulk_update_or_create(obj_class, ids_to_data_mapping, ids_to_update,
         batch_size=batch_size,
     )
 
-    obj_class.objects.bulk_create(
-        [
-            obj_class(**obj_class.get_raw_json_for_bulk_operations(ids_to_data_mapping[create_id])) for
-            create_id in ids_to_create
-        ],
-        batch_size=batch_size
-    )
+
+def general_bulk_update_or_create(obj_class, ids_to_data_mapping, ids_to_update, ids_to_create, fields_to_update, batch_size):
+    general_bulk_update(obj_class, ids_to_data_mapping, ids_to_update, fields_to_update, batch_size)
+    general_bulk_create(obj_class, ids_to_data_mapping, ids_to_create, batch_size)
 
