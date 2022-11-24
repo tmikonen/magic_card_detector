@@ -42,29 +42,23 @@ def card(req, card_uuid):
     return HttpResponse("You're looking at card {}".format(card_uuid))
 
 
-def import_cards_from_url(req):
-    template = loader.get_template('cards/import_from_request.html')
-    context = {
+def library(req):
+    if req.user.is_authenticated:
+        all_cards = Card.objects.all().filter().annotate(set_name=F('card_set__name')).order_by('name').annotate(
+            card_img=Subquery(
+                CardFace.objects.filter(
+                    card__id=OuterRef('id')
+                ).distinct('card__id').values('small_img_uri')
 
-    }
-    return HttpResponse(template.render(context, req))
+            )
+        )
+        card_paginator = Paginator(all_cards, 25)
 
+        page = req.GET.get('page') or 1
+        page_obj = card_paginator.get_page(page)
 
-def run_import(req):
-    url = req.POST['scryfall_url']
-    logger.info(url)
-
-    response = requests.get(url, headers={"Accept": "application/json"})
-    json_data = json.loads(response.text)
-
-    if json_data['object'] == 'card':
-        card_json = [json_data]
-    elif json_data['object'] == 'list':
-        card_json = json_data['data']
+        return render(req, 'cards/list.html', {'page_obj': page_obj})
     else:
-        return HttpResponseRedirect(reverse(cards))
+        return
 
-    for card_data in card_json:
-        Card.get_or_create_from_scryfall_json(card_data)
 
-    return HttpResponseRedirect(reverse(cards))
