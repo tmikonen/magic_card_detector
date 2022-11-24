@@ -3,6 +3,7 @@ import re
 import uuid
 import logging
 
+from django.contrib.auth.models import User
 from django.core.exceptions import FieldError
 from django.db import models
 from django.db.models import Count, F
@@ -13,24 +14,24 @@ logger = logging.getLogger(__name__)
 
 
 #####    Non-card related   #####
-class User(models.Model):
-    """Represents a user of the system
-    """
-    id = models.UUIDField(primary_key=True, editable=False, default=uuid.uuid4)
-    first_name = models.CharField(max_length=256)
-    last_name = models.CharField(max_length=256)
-
-    # TODO: Replace with google OAuth
-    username = models.CharField(max_length=64)
-
-    def get_card_library_query_set(self):
-        return Card.objects.filter(cardownership__user__id=self.id)
-
-    def get_unique_card_library_query_set(self):
-        return self.get_card_library_query_set().distinct()
-
-    def get_unique_card_library_count_query_set(self):
-        return self.get_card_library_query_set().annotate(count=Count('unique_string'))
+# class User(models.Model):
+#     """Represents a user of the system
+#     """
+#     id = models.UUIDField(primary_key=True, editable=False, default=uuid.uuid4)
+#     first_name = models.CharField(max_length=256)
+#     last_name = models.CharField(max_length=256)
+#
+#     # TODO: Replace with google OAuth
+#     username = models.CharField(max_length=64)
+#
+#     def get_card_library_query_set(self):
+#         return Card.objects.filter(cardownership__user__id=self.id)
+#
+#     def get_unique_card_library_query_set(self):
+#         return self.get_card_library_query_set().distinct()
+#
+#     def get_unique_card_library_count_query_set(self):
+#         return self.get_card_library_query_set().annotate(count=Count('unique_string'))
 
 
 #########      Storage    ##########
