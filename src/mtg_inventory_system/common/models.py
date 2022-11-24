@@ -88,7 +88,7 @@ class Card(models.Model):
     layout = models.CharField(max_length=20, choices=CARD_LAYOUT_OPTIONS)
     name = models.CharField(max_length=500)
 
-    conv_mana_cost = models.PositiveSmallIntegerField()
+    conv_mana_cost = models.IntegerField()
 
     released_at = models.DateField(default=datetime.date(year=1993, month=9, day=1))
     time_added_to_db = models.DateTimeField(auto_now_add=True)
@@ -160,7 +160,7 @@ class CardFace(models.Model):
     def non_id_fields():
         return [
             'name',
-            'mana_cost_id',
+            'mana_cost',
             'power',
             'toughness',
             'type_line',
@@ -189,7 +189,7 @@ class CardFace(models.Model):
         return {
             'name': card_json['name'],
             'card_id': card_id,
-            'mana_cost_id': CardFace._parse_mana_costs_from_scryfall_json(card_json['mana_cost']),
+            'mana_cost': CardFace._parse_mana_costs_from_scryfall_json(card_json['mana_cost']),
             'power': power,
             'toughness': toughness,
             'type_line': card_json.get('type_line'),
