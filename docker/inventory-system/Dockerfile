@@ -1,7 +1,7 @@
 FROM python:3.10.8-slim-buster
 
 RUN apt-get update
-RUN apt-get install python3-psycopg2 psql -y
+RUN apt-get install python3-psycopg2 postgresql postgresql-contrib -y
 
 WORKDIR /src
 

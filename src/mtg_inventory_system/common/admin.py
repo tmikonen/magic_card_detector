@@ -6,7 +6,6 @@ from .models import *
 admin.site.register(User)
 admin.site.register(StorageLocation)
 admin.site.register(CardSet)
-admin.site.register(ManaCost)
 admin.site.register(CardFace)
 admin.site.register(Card)
 admin.site.register(CardOwnership)

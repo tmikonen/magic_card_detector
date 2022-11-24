@@ -66,58 +66,16 @@ class CardSet(models.Model):
             'icon_uri': set_json['icon_svg_uri'],
         }
 
-
-class ManaCost(models.Model):
-    green = models.PositiveSmallIntegerField(null=True, default=None)
-    red = models.PositiveSmallIntegerField(null=True, default=None)
-    blue = models.PositiveSmallIntegerField(null=True, default=None)
-    black = models.PositiveSmallIntegerField(null=True, default=None)
-    white = models.PositiveSmallIntegerField(null=True, default=None)
-    colourless = models.PositiveSmallIntegerField(null=True, default=None)
-    x_mana = models.BooleanField(default=False)
-    other = models.BooleanField(default=False)
-
-    class Meta:
-        unique_together = ('green', 'red', 'blue', 'black', 'white', 'colourless')
-
     @staticmethod
-    def _parse_scryfall_json_to_model_args(mana_json_string):
-        mana = {}
-
-        mana_regex = r'\{[1-9A-Z]\}'
-        alt_mana_regex = r'\{B/P\}'
-        mana_breakdown = re.findall(mana_regex, mana_json_string)
-        alt_mana_breakdown = re.findall(alt_mana_regex, mana_json_string)
-
-        for mana_sym in mana_breakdown:
-            symbol = mana_sym.replace('{', "").replace("}", "")
-            try:
-                un_col = int(symbol)
-                mana['un_col'] = un_col
-            except ValueError:
-                num = mana.get(symbol) or 0
-                mana[symbol] = num + 1
-
-        return {
-            'green': mana.get('G'),
-            'red': mana.get('R'),
-            'blue': mana.get('U'),
-            'black': mana.get('B'),
-            'white': mana.get('W'),
-            'colourless': mana.get('un_col'),
-            'x_mana': mana.get('x') is not None,
-            'other': len(alt_mana_breakdown) > 0,
-        }
-
-    @classmethod
-    def get_or_create_from_scryfall_json(cls, mana_json_string):
-        args_dict = cls._parse_scryfall_json_to_model_args(mana_json_string)
-        return cls.objects.get_or_create(**args_dict)
-
-    @classmethod
-    def update_or_create_from_scryfall_json(cls, mana_json_string):
-        args_dict = cls._parse_scryfall_json_to_model_args(mana_json_string)
-        return cls.objects.update_or_create(**args_dict)
+    def non_id_fields():
+        return [
+            'name',
+            'symbol',
+            'set_type',
+            'scryfall_uri',
+            'scryfall_set_cards_uri',
+            'icon_uri',
+        ]
 
 
 class Card(models.Model):
@@ -147,6 +105,18 @@ class Card(models.Model):
         return str(self.id)
 
     @staticmethod
+    def non_id_fields():
+        return [
+            'scryfall_uri',
+            'scryfall_url',
+            'layout',
+            'name',
+            'released_at',
+            'conv_mana_cost',
+            'card_set_id',
+        ]
+
+    @staticmethod
     def get_raw_json_for_bulk_operations(card_json):
         return {
             'id': card_json['id'],
@@ -174,7 +144,7 @@ class CardFace(models.Model):
     """Sometimes MTG cards can have more than one face tied to it. This represents that data
     """
     name = models.CharField(max_length=256)
-    mana_cost = models.ForeignKey(ManaCost, on_delete=models.DO_NOTHING, null=True, default=None)
+    mana_cost = models.JSONField()
 
     power = models.SmallIntegerField(null=True)
     toughness = models.SmallIntegerField(null=True)
@@ -185,6 +155,20 @@ class CardFace(models.Model):
     normal_img_uri = models.URLField(null=True)
 
     card = models.ForeignKey(Card, on_delete=models.DO_NOTHING)
+
+    @staticmethod
+    def non_id_fields():
+        return [
+            'name',
+            'mana_cost_id',
+            'power',
+            'toughness',
+            'type_line',
+            'oracle_text',
+            'small_img_uri',
+            'normal_img_uri',
+            'card',
+        ]
 
     @staticmethod
     def _parse_scryfall_json_to_model_args(card_json, card_id):
@@ -205,13 +189,42 @@ class CardFace(models.Model):
         return {
             'name': card_json['name'],
             'card_id': card_id,
-            'mana_cost_id': ManaCost.get_or_create_from_scryfall_json(card_json['mana_cost'])[0].id,
+            'mana_cost_id': CardFace._parse_mana_costs_from_scryfall_json(card_json['mana_cost']),
             'power': power,
             'toughness': toughness,
             'type_line': card_json.get('type_line'),
             'oracle_text': card_json.get('oracle_text'),
             'small_img_uri': card_json.get('image_uris').get('small'),
             'normal_img_uri': card_json.get('image_uris').get('normal'),
+        }
+
+    @staticmethod
+    def _parse_mana_costs_from_scryfall_json(mana_json_string):
+        mana = {}
+
+        mana_regex = r'\{[1-9A-Z]\}'
+        alt_mana_regex = r'\{B/P\}'
+        mana_breakdown = re.findall(mana_regex, mana_json_string)
+        alt_mana_breakdown = re.findall(alt_mana_regex, mana_json_string)
+
+        for mana_sym in mana_breakdown:
+            symbol = mana_sym.replace('{', "").replace("}", "")
+            try:
+                un_col = int(symbol)
+                mana['un_col'] = un_col
+            except ValueError:
+                num = mana.get(symbol) or 0
+                mana[symbol] = num + 1
+
+        return {
+            'green': mana.get('G'),
+            'red': mana.get('R'),
+            'blue': mana.get('U'),
+            'black': mana.get('B'),
+            'white': mana.get('W'),
+            'colourless': mana.get('un_col'),
+            'x_mana': mana.get('x') is not None,
+            'other': len(alt_mana_breakdown) > 0,
         }
 
     @staticmethod
@@ -228,7 +241,7 @@ class CardFace(models.Model):
 
                 card_face_args.append(CardFace._parse_scryfall_json_to_model_args(face, card_id))
         else:
-            mana_cost_id = ManaCost.get_or_create_from_scryfall_json(card_json['mana_cost'])[0].id
+            mana_cost = CardFace._parse_mana_costs_from_scryfall_json(card_json['mana_cost'])
             toughness = card_json.get('toughness')
             if toughness:
                 try:
@@ -246,7 +259,7 @@ class CardFace(models.Model):
             card_face_args.append(
                 {
                     'name': card_json['name'],
-                    'mana_cost_id': mana_cost_id,
+                    'mana_cost': mana_cost,
                     'card_id': card_id,
                     'power': power,
                     'toughness': toughness,
