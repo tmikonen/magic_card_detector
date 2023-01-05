@@ -285,7 +285,7 @@ class CardFace(models.Model):
 
 
 class CardOwnership(models.Model):
-    """Represents and instance of a card in a user's library. So a user can have multiple copies of the same card
+    """Represents and instance of a card in a user's forms. So a user can have multiple copies of the same card
     """
     # Foreign Relations
     user = models.ForeignKey(User, on_delete=models.DO_NOTHING)

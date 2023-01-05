@@ -73,6 +73,7 @@ TEMPLATES = [
 ]
 
 LOGIN_REDIRECT_URL = "/cards"
+LOGIN_URL = "/login"
 
 WSGI_APPLICATION = 'mtg_inventory_system.wsgi.application'
 
