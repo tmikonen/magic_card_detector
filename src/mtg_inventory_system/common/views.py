@@ -88,7 +88,7 @@ def library(req):
         page = req.GET.get('page') or 1
         page_obj = card_paginator.get_page(page)
 
-        return render(req, 'cards/list.html', {'page_obj': page_obj})
+        return render(req, 'cards/library.html', {'page_obj': page_obj})
     else:
         return redirect('{}?next={}'.format(settings.LOGIN_URL, req.path))
 
@@ -106,5 +106,13 @@ def add_to_library_form(req, card_uuid):
             form.card = Card.objects.get(id=card_uuid)
 
         return render(req, 'forms/add_to_library.html', {'form': form})
+    else:
+        return redirect('{}?next={}'.format(settings.LOGIN_URL, req.path))
+
+
+def clear_library(req):
+    if req.user.is_authenticated:
+        req.user.cardownership_set.all().delete()
+        return redirect('/cards/')
     else:
         return redirect('{}?next={}'.format(settings.LOGIN_URL, req.path))
