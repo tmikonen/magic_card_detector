@@ -93,28 +93,18 @@ def library(req):
         return redirect('{}?next={}'.format(settings.LOGIN_URL, req.path))
 
 
-def add_to_library(req):
+def add_to_library_form(req, card_uuid):
     if req.user.is_authenticated:
         if req.method == 'POST':
             form = CreateCardOwnershipForm(req.POST)
+            form.card = Card.objects.get(id=card_uuid)
             if form.is_valid():
-                return HttpResponseRedirect('/library/')
+                form.add_to_library(req.user)
+                return HttpResponseRedirect('/cards/')
         else:
             form = CreateCardOwnershipForm()
+            form.card = Card.objects.get(id=card_uuid)
 
         return render(req, 'forms/add_to_library.html', {'form': form})
     else:
         return redirect('{}?next={}'.format(settings.LOGIN_URL, req.path))
-
-
-class CreateCardOwnership(CreateView):
-    model = CardOwnership
-    form_class = CreateCardOwnershipForm
-    template_name = 'forms/add_to_library.html'
-    success_url = 'library'
-    
-    def get_form_kwargs(self, **kwargs):
-        form_kwargs = super(CreateCardOwnership, self).get_form_kwargs(**kwargs)
-        form_kwargs['user'] = self.request.user
-        form_kwargs['card'] = Card.objects.get(id=self.request.card_id)
-        return form_kwargs

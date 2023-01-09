@@ -13,11 +13,7 @@
               <p>Card Set: {{ card.set_name }}</p>
               <li><a href={{ card.scryfall_url }}>Scryfall Link</a></li>
               <li><a href="{% url 'card_details' card.id %}">More Details</a></li>
-              <br>
-              <form action="{% url 'add_to_library' %}" method="post">
-                  {% csrf_token %}
-                  <button type="submit" value={{ card.id }}>Add to Library</button>
-              </form>
+              <li><a href="{% url 'add_to_library_form' card.id %}">Add Card to Library</a></li>
           </div>
         </div>
         <hr>
