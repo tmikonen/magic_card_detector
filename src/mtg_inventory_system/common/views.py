@@ -96,10 +96,6 @@ class CardDetailView(DetailView):
         return result
 
 
-def card(req, card_uuid):
-    return HttpResponse("You're looking at card {}".format(card_uuid))
-
-
 def import_library(req):
     if req.user.is_authenticated:
         all_cards = Card.objects.all().filter().annotate(set_name=F('card_set__name')).order_by('name').annotate(
