@@ -16,7 +16,7 @@ from django.urls import reverse
 from urllib.parse import urlencode
 
 from django.views import View
-from django.views.generic import CreateView, ListView
+from django.views.generic import CreateView, ListView, DetailView
 
 from .forms import *
 from .models import Card, CardFace, CardOwnership
@@ -44,32 +44,55 @@ class CardsListView(ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        result = super(CardsListView, self).get_queryset().annotate(set_name=F('card_set__name')).order_by('name')\
-                .annotate(
-                    card_img=Subquery(
-                        CardFace.objects.filter(
-                            card__id=OuterRef('id')
-                        ).distinct('card__id').values('small_img_uri')
+        result = super(CardsListView, self).get_queryset().annotate(set_name=F('card_set__name')).order_by('name') \
+            .annotate(
+            card_img=Subquery(
+                CardFace.objects.filter(
+                    card__id=OuterRef('id')
+                ).distinct('card__id').values('small_img_uri')
 
-                    )
             )
+        )
         query = self.request.GET.get('search')
         if query:
             post_result = Card.objects.filter(
                 Q(name__icontains=query) |
-                Q(cardface__type_line__icontains=query)|
+                Q(cardface__type_line__icontains=query) |
                 Q(cardface__oracle_text__icontains=query)
-            )\
-                .annotate(set_name=F('card_set__name')).order_by('name')\
+            ) \
+                .annotate(set_name=F('card_set__name')).order_by('name') \
                 .annotate(
-                    card_img=Subquery(
-                        CardFace.objects.filter(
-                            card__id=OuterRef('id')
-                        ).distinct('card__id').values('small_img_uri')
+                card_img=Subquery(
+                    CardFace.objects.filter(
+                        card__id=OuterRef('id')
+                    ).distinct('card__id').values('small_img_uri')
 
-                    )
+                )
             )
             result = post_result
+        return result
+
+
+class CardDetailView(DetailView):
+    model = Card
+    template_name = "cards/view_card.html"
+
+    def get_context_data(self, **kwargs):
+        result = super(CardDetailView, self).get_context_data(**kwargs)
+        # General Card Details
+        result['image_uris'] = CardFace.objects.filter(card_id=result['card'].pk)\
+            .values_list('normal_img_uri', flat=True)
+        result['set_name'] = result['card'].card_set.name
+
+        # General Library Details
+        ownership_objs = CardOwnership.objects.filter(user=self.request.user, card__id=result['card'].id)
+        if ownership_objs:
+            lib_details = {
+                'count': len(ownership_objs),
+                'avg_purchase': sum(CardOwnership.objects.filter(user=self.request.user, card__id=result['card'].id).values_list('price_purchased', flat=True)) / len(ownership_objs)
+            }
+            result['library_details'] = lib_details
+
         return result
 
 

@@ -1,0 +1,18 @@
+ <div class="card_row">
+          <div class="card_column">
+              <img src="{{ image_uris.0 }}" alt="{{ object.name }}">
+          </div>
+          <div class="card_column">
+              <h2>Card Details</h2>
+                  <p>Card Name: {{ object.name }}</p>
+                  <p>Card Set: {{ set_name }}</p>
+
+              {% if library_details %}
+                <h2>Library Details</h2>
+                  <p>Number in collection: {{ library_details.count }}</p>
+                  <p>Average purchase price: $ {{ library_details.avg_purchase }}</p>
+              {% else %}
+                <p>This card is not in your library</p>
+              {% endif %}
+          </div>
+        </div>
