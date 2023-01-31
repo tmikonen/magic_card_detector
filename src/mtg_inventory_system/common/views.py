@@ -15,7 +15,8 @@ from django.template import loader
 from django.urls import reverse
 from urllib.parse import urlencode
 
-from django.views.generic import CreateView
+from django.views import View
+from django.views.generic import CreateView, ListView
 
 from .forms import *
 from .models import Card, CardFace, CardOwnership
@@ -23,25 +24,53 @@ from .models import Card, CardFace, CardOwnership
 logger = logging.getLogger(__name__)
 
 
+class AuthViewMixin(View):
+    def dispatch(self, request, *args, **kwargs):
+        response = super(AuthViewMixin, self).dispatch(request, *args, **kwargs)
+
+        if not request.user.is_authenticated:
+            response = redirect('{}?next={}'.format(settings.LOGIN_URL, request.path))
+
+        return response
+
+
 def index(req):
     return HttpResponse("Hello, world. You're at the common index.")
 
 
-def all_cards(req):
-    cards = Card.objects.all().annotate(set_name=F('card_set__name')).order_by('name').annotate(
-        card_img=Subquery(
-            CardFace.objects.filter(
-                card__id=OuterRef('id')
-            ).distinct('card__id').values('small_img_uri')
+class CardsListView(ListView):
+    model = Card
+    template_name = 'cards/list.html'
+    paginate_by = 25
 
-        )
-    )
-    card_paginator = Paginator(cards, 25)
+    def get_queryset(self):
+        result = super(CardsListView, self).get_queryset().annotate(set_name=F('card_set__name')).order_by('name')\
+                .annotate(
+                    card_img=Subquery(
+                        CardFace.objects.filter(
+                            card__id=OuterRef('id')
+                        ).distinct('card__id').values('small_img_uri')
 
-    page = req.GET.get('page') or 1
-    page_obj = card_paginator.get_page(page)
+                    )
+            )
+        query = self.request.GET.get('search')
+        if query:
+            post_result = Card.objects.filter(
+                Q(name__icontains=query) |
+                Q(cardface__type_line__icontains=query)|
+                Q(cardface__oracle_text__icontains=query)
+            )\
+                .annotate(set_name=F('card_set__name')).order_by('name')\
+                .annotate(
+                    card_img=Subquery(
+                        CardFace.objects.filter(
+                            card__id=OuterRef('id')
+                        ).distinct('card__id').values('small_img_uri')
 
-    return render(req, 'cards/list.html', {'page_obj': page_obj})
+                    )
+            )
+            result = post_result
+        return result
 
 
 def card(req, card_uuid):
@@ -68,29 +97,14 @@ def import_library(req):
         return redirect('{}?next={}'.format(settings.LOGIN_URL, req.path))
 
 
-def library(req):
-    if req.user.is_authenticated:
-        card_ids_owned = CardOwnership.objects.all().filter(user=req.user).values_list('card__id', flat=True)
+class LibraryCardsListView(CardsListView, AuthViewMixin):
+    model = Card
+    template_name = 'cards/library.html'
+    paginate_by = 25
 
-        all_cards_owned = Card.objects.all().filter(
-            id__in=card_ids_owned
-        ).annotate(set_name=F('card_set__name')).order_by('name').annotate(
-            card_img=Subquery(
-                CardFace.objects.filter(
-                    card__id=OuterRef('id')
-                ).distinct('card__id').values('small_img_uri')
-
-            )
-        )
-
-        card_paginator = Paginator(all_cards_owned, 25)
-
-        page = req.GET.get('page') or 1
-        page_obj = card_paginator.get_page(page)
-
-        return render(req, 'cards/library.html', {'page_obj': page_obj})
-    else:
-        return redirect('{}?next={}'.format(settings.LOGIN_URL, req.path))
+    def get_queryset(self):
+        result = super(LibraryCardsListView, self).get_queryset().filter(cardownership__user=self.request.user)
+        return result
 
 
 def add_to_library_form(req, card_uuid):
