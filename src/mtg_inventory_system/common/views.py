@@ -80,7 +80,7 @@ class CardDetailView(DetailView):
     def get_context_data(self, **kwargs):
         result = super(CardDetailView, self).get_context_data(**kwargs)
         # General Card Details
-        result['image_uris'] = CardFace.objects.filter(card_id=result['card'].pk)\
+        result['image_uris'] = CardFace.objects.filter(card_id=result['card'].pk) \
             .values_list('normal_img_uri', flat=True)
         result['set_name'] = result['card'].card_set.name
 
@@ -89,7 +89,9 @@ class CardDetailView(DetailView):
         if ownership_objs:
             lib_details = {
                 'count': len(ownership_objs),
-                'avg_purchase': sum(CardOwnership.objects.filter(user=self.request.user, card__id=result['card'].id).values_list('price_purchased', flat=True)) / len(ownership_objs)
+                'avg_purchase': sum(CardOwnership.objects.filter(
+                    user=self.request.user,
+                    card__id=result['card'].id).values_list('price_purchased', flat=True)) / len(ownership_objs)
             }
             result['library_details'] = lib_details
 
