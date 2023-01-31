@@ -15,7 +15,7 @@ from django.template import loader
 from django.urls import reverse
 from urllib.parse import urlencode
 
-from django.views.generic import CreateView
+from django.views.generic import CreateView, ListView
 
 from .forms import *
 from .models import Card, CardFace, CardOwnership
@@ -27,21 +27,50 @@ def index(req):
     return HttpResponse("Hello, world. You're at the common index.")
 
 
-def all_cards(req):
-    cards = Card.objects.all().annotate(set_name=F('card_set__name')).order_by('name').annotate(
-        card_img=Subquery(
-            CardFace.objects.filter(
-                card__id=OuterRef('id')
-            ).distinct('card__id').values('small_img_uri')
+class AllCardsSearchView(ListView):
+    model = Card
+    template_name = 'cards/list.html'
+    paginate_by = 25
 
-        )
-    )
-    card_paginator = Paginator(cards, 25)
+    def get_queryset(self):
+        result = super(AllCardsSearchView, self).get_queryset().annotate(set_name=F('card_set__name')).order_by('name')\
+                .annotate(
+                    card_img=Subquery(
+                        CardFace.objects.filter(
+                            card__id=OuterRef('id')
+                        ).distinct('card__id').values('small_img_uri')
 
-    page = req.GET.get('page') or 1
-    page_obj = card_paginator.get_page(page)
+                    )
+            )
+        query = self.request.GET.get('search')
+        if query:
+            post_result = Card.objects.filter(
+                Q(name__icontains=query) |
+                Q(cardface__type_line__icontains=query)|
+                Q(cardface__oracle_text__icontains=query)
+            )\
+                .annotate(set_name=F('card_set__name')).order_by('name')\
+                .annotate(
+                    card_img=Subquery(
+                        CardFace.objects.filter(
+                            card__id=OuterRef('id')
+                        ).distinct('card__id').values('small_img_uri')
 
-    return render(req, 'cards/list.html', {'page_obj': page_obj})
+                    )
+            )
+            result = post_result
+        # else:
+        #     result = Card.objects.all()\
+        #         .annotate(set_name=F('card_set__name')).order_by('name')\
+        #         .annotate(
+        #             card_img=Subquery(
+        #                 CardFace.objects.filter(
+        #                     card__id=OuterRef('id')
+        #                 ).distinct('card__id').values('small_img_uri')
+        #
+        #             )
+        #     )
+        return result
 
 
 def card(req, card_uuid):
