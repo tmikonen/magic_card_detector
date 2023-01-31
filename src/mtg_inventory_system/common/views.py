@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 
-from django.db.models import F, Q, Value, URLField, Subquery, OuterRef
+from django.db.models import F, Q, Value, URLField, Subquery, OuterRef, Count
 from django.shortcuts import render, redirect
 from django.http import HttpResponse, HttpResponseRedirect
 from django.template import loader
@@ -88,10 +88,10 @@ class CardDetailView(DetailView):
         ownership_objs = CardOwnership.objects.filter(user=self.request.user, card__id=result['card'].id)
         if ownership_objs:
             lib_details = {
-                'count': len(ownership_objs),
+                'count': ownership_objs.count(),
                 'avg_purchase': sum(CardOwnership.objects.filter(
                     user=self.request.user,
-                    card__id=result['card'].id).values_list('price_purchased', flat=True)) / len(ownership_objs)
+                    card__id=result['card'].id).values_list('price_purchased', flat=True)) / ownership_objs.count()
             }
             result['library_details'] = lib_details
 
@@ -125,7 +125,8 @@ class LibraryCardsListView(CardsListView, AuthViewMixin):
 
     def get_queryset(self):
         result = super(LibraryCardsListView, self).get_queryset().filter(cardownership__user=self.request.user)
-        return result
+        aggregated_results = result.annotate(id_count=Count('id'))
+        return aggregated_results
 
 
 def add_to_library_form(req, card_uuid):
