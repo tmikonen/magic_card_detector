@@ -1,0 +1,39 @@
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'cards/style.css' %}">
+
+{% for card in page_obj %}
+    <ul>
+     <div class="card_row">
+          <div class="card_column">
+              <img src="{{ card.card_img }}" alt="{{ card.name }}">
+          </div>
+          <div class="card_column">
+              <p>Card Name: {{ card.name }}</p>
+              <p>Card Set: {{ card.set_name }}</p>
+              <li><a href={{ card.scryfall_url }}>Scryfall Link</a></li>
+              <li><a href="{% url 'card_details' card.id %}">More Details</a></li>
+              <li><a href="{% url 'add_to_library_form' card.id %}">Add Card to Library</a></li>
+          </div>
+        </div>
+        <hr>
+    </ul>
+{% endfor %}
+
+<div class="pagination">
+    <span class="step-links">
+        {% if page_obj.has_previous %}
+            <a href="?page=1">&laquo; first</a>
+            <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+        {% endif %}
+
+        <span class="current">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+        </span>
+
+        {% if page_obj.has_next %}
+            <a href="?page={{ page_obj.next_page_number }}">next</a>
+            <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+        {% endif %}
+    </span>
+</div>
