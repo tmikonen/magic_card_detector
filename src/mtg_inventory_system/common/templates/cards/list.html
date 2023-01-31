@@ -1,6 +1,6 @@
-{% load static %}
+{% extends 'base.html' %}
 
-<link rel="stylesheet" href="{% static 'cards/style.css' %}">
+{% block content %}
 
 {% include "elements/search_bar.html" %}
 
@@ -9,3 +9,5 @@
 {% endfor %}
 
 {% include "elements/pagination_footer.html" %}
+
+{% endblock %}

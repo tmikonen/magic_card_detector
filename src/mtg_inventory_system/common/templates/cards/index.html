@@ -1,6 +1,6 @@
-{% load static %}
+{% extends 'base.html' %}
 
-<link rel="stylesheet" href="{% static 'cards/style.css' %}">
+{% block content %}
 
 {% if all_cards %}
     <ul>
@@ -22,3 +22,5 @@
 {% else %}
     <p>No cards are available.</p>
 {% endif %}
+
+{% endblock %}

@@ -1,7 +1,9 @@
-{% load static %}
+{% extends 'base.html' %}
 
-<link rel="stylesheet" href="{% static 'cards/style.css' %}">
+{% block content %}
 
 <button onclick="location.href='{% url 'clear_library' %}'">Clear Library</button>
 
 {% include "./list.html" %}
+
+{% endblock %}

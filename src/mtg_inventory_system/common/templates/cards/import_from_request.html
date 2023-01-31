@@ -1,6 +1,6 @@
-{% load static %}
+{% extends 'base.html' %}
 
-<link rel="stylesheet" href="{% static 'cards/style.css' %}">
+{% block content %}
 
 <form action="{% url 'run_import' %}" method="post">
 {% csrf_token %}
@@ -11,3 +11,5 @@
 
 <input type="submit" value="Import">
 </form>
+
+{% endblock %}

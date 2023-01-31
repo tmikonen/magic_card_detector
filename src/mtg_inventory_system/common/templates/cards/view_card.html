@@ -1,5 +1,5 @@
-{% load static %}
+{% extends 'base.html' %}
 
-<link rel="stylesheet" href="{% static 'cards/style.css' %}">
-
-{% include "elements/card_details.html" %}
+{% block content %}
+    {% include "elements/card_details.html" %}
+{% endblock %}
