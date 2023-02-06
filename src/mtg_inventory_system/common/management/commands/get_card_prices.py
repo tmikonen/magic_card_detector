@@ -56,5 +56,5 @@ class Command(BaseCommand):
                 [CardPrice(**card_price) for card_price in card_prices],
                 batch_size=batch_size
             )
-        print(f"Time to create Card Faces: {t():.4f} secs")
+        print(f"Time to create and insert card prices: {t():.4f} secs")
 
