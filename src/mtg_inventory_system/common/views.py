@@ -2,7 +2,6 @@ import json
 import logging
 import time
 
-import requests
 from django.contrib.auth.models import User
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -10,7 +9,7 @@ from django.core.paginator import Paginator
 
 from django.db.models import F, Q, Value, URLField, Subquery, OuterRef, Count
 from django.shortcuts import render, redirect
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.template import loader
 from django.urls import reverse
 from urllib.parse import urlencode
@@ -19,7 +18,7 @@ from django.views import View
 from django.views.generic import CreateView, ListView, DetailView
 
 from .forms import *
-from .models import Card, CardFace, CardOwnership
+from .models import Card, CardFace, CardOwnership, CardPrice
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +82,13 @@ class CardDetailView(DetailView):
         result['image_uris'] = CardFace.objects.filter(card_id=result['card'].pk) \
             .values_list('normal_img_uri', flat=True)
         result['set_name'] = result['card'].card_set.name
+        result['card_id'] = result['card'].id
+
+        # Card prices
+        price_data = CardPrice.objects.filter(card_id=result['card']).values('date', 'price_usd').order_by('date')
+        result['recent_cost_date'] = str(price_data.first()['date'])
+        result['recent_cost'] = float(price_data.first()['price_usd'] or 0)
+        result['price_data'] = usd_card_price_chart_data(result['card_id'])
 
         # General Library Details
         ownership_objs = CardOwnership.objects.filter(user=self.request.user, card__id=result['card'].id)
@@ -96,6 +102,23 @@ class CardDetailView(DetailView):
             result['library_details'] = lib_details
 
         return result
+
+
+def usd_card_price_chart_data(card_uuid):
+    price_data = CardPrice.objects.filter(card_id=card_uuid).values('date', 'price_usd').order_by('date')
+    labels = [str(d) for d in price_data.values_list('date', flat=True)]
+    prices = [float(price or 0) for price in price_data.values_list('price_usd', flat=True)]
+    data = {
+        'labels': labels,
+        'datasets': [
+            {
+                'label': 'Price USD',
+                'data': prices
+            }
+        ]
+    }
+
+    return json.loads(json.dumps(data))
 
 
 def import_library(req):
