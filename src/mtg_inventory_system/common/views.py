@@ -43,31 +43,20 @@ class CardsListView(ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        result = super(CardsListView, self).get_queryset().annotate(set_name=F('card_set__name')).order_by('name') \
+        result = super(CardsListView, self).get_queryset().distinct('name').order_by('name') \
             .annotate(
             card_img=Subquery(
                 CardFace.objects.filter(
                     card__id=OuterRef('id')
                 ).distinct('card__id').values('small_img_uri')
-
             )
         )
         query = self.request.GET.get('search')
         if query:
-            post_result = Card.objects.filter(
+            post_result = result.filter(
                 Q(name__icontains=query) |
                 Q(cardface__type_line__icontains=query) |
-                Q(cardface__oracle_text__icontains=query)
-            ) \
-                .annotate(set_name=F('card_set__name')).order_by('name') \
-                .annotate(
-                card_img=Subquery(
-                    CardFace.objects.filter(
-                        card__id=OuterRef('id')
-                    ).distinct('card__id').values('small_img_uri')
-
-                )
-            )
+                Q(cardface__oracle_text__icontains=query))
             result = post_result
         return result
 
