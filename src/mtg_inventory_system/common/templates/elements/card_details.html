@@ -11,10 +11,10 @@
         <h2>Library Details</h2>
           <p>Number in collection: {{ library_details.count }}</p>
           <p>Average purchase price (USD): $ {{ library_details.avg_purchase }}</p>
-          <p>Most recent market price (USD): $ {{ recent_cost }} ({{ recent_cost_date }})</p>
       {% else %}
         <p>This card is not in your library</p>
       {% endif %}
+    <p>Most recent market price {{ currency }}: {{ currency_symbol }} {{ recent_cost }} ({{ recent_cost_date }})</p>
   <div class="price_details">
         {% include "./card_price_history.html" %}
     </div>

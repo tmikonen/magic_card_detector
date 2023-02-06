@@ -86,8 +86,17 @@ class CardDetailView(DetailView):
 
         # Card prices
         price_data = CardPrice.objects.filter(card_id=result['card']).values('date', 'price_usd').order_by('date')
-        result['recent_cost_date'] = str(price_data.first()['date'])
-        result['recent_cost'] = float(price_data.first()['price_usd'] or 0)
+        price_found = False
+        for price in list(price_data):
+            if price['price_usd']:
+                result['recent_cost_date'] = str(price['date'])
+                result['recent_cost'] = float(price['price_usd'])
+                result['currency'] = '(USD)'
+                result['currency_symbol'] = '$'
+                price_found = True
+        if not price_found:
+            result['recent_cost'] = 'N/A'
+            result['recent_cost_date'] = price_data.first()['date']
         result['price_data'] = usd_card_price_chart_data(result['card_id'])
 
         # General Library Details
