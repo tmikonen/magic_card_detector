@@ -43,7 +43,7 @@ class CardsListView(ListView):
     paginate_by = 25
 
     def get_queryset(self):
-        result = super(CardsListView, self).get_queryset().distinct('name').order_by('name') \
+        result = super(CardsListView, self).get_queryset().order_by('name', 'card_set__name').distinct('name') \
             .annotate(
             card_img=Subquery(
                 CardFace.objects.filter(
@@ -86,7 +86,7 @@ class CardDetailView(DetailView):
         if not price_found:
             result['recent_cost'] = 'N/A'
             result['recent_cost_date'] = price_data.first()['date']
-        result['price_data'] = usd_card_price_chart_data(result['card_id'])
+        result['price_data'] = usd_card_price_chart_data(result['card'].name)
 
         # General Library Details
         ownership_objs = CardOwnership.objects.filter(user=self.request.user, card__id=result['card'].id)
@@ -102,8 +102,14 @@ class CardDetailView(DetailView):
         return result
 
 
-def usd_card_price_chart_data(card_uuid):
-    price_data = CardPrice.objects.filter(card_id=card_uuid).values('date', 'price_usd').order_by('date')
+def usd_card_price_chart_data(card_name):
+    price_data = CardPrice.objects.filter(card__name=card_name).values(
+        'date',
+        'price_usd',
+        'card_id',
+        set_name=F('card__card_set__name')
+    ).order_by('date')
+
     labels = [str(d) for d in price_data.values_list('date', flat=True)]
     prices = [float(price or 0) for price in price_data.values_list('price_usd', flat=True)]
     data = {
