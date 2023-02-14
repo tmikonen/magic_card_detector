@@ -117,7 +117,8 @@ def usd_card_price_chart_data(card_name):
         'date',
         'price_usd',
         'card_id',
-        set_name=F('card__card_set__name')
+        set_name=F('card__card_set__name'),
+        collector_number=F('card__collector_number'),
     ).order_by('date')
     # all_dates = set(price_data.values_list('date', flat=True)
     # all_printings_set = set(price_data.values_list('set_name', flat=True))
@@ -127,9 +128,9 @@ def usd_card_price_chart_data(card_name):
     printing_to_price_details = {}
     for data in price_data:
         try:
-            printing_to_price_details[data['set_name']].append(float(data.get('price_usd') or 0))
+            printing_to_price_details[f'{data["set_name"]} #{data["collector_number"]}'].append(float(data.get('price_usd') or 0))
         except KeyError:
-            printing_to_price_details[data['set_name']] = [float(data.get('price_usd') or 0)]
+            printing_to_price_details[f'{data["set_name"]} #{data["collector_number"]}'] = [float(data.get('price_usd') or 0)]
 
     labels = [str(d) for d in price_data.values_list('date', flat=True)]
     datasets = [_price_obj(card_set, prices) for card_set, prices in printing_to_price_details.items()]

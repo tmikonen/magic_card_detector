@@ -107,6 +107,10 @@ class Card(models.Model):
     def unique_string(self):
         return str(self.id)
 
+    @property
+    def display_name(self):
+        return f'{self.name} #{self.collector_number}'
+
     @staticmethod
     def non_id_fields():
         return [
