@@ -1,6 +1,8 @@
 import json
 import logging
+# import numpy as np
 import time
+from collections import defaultdict
 
 from django.contrib.auth.models import User
 from django.conf import settings
@@ -16,6 +18,7 @@ from urllib.parse import urlencode
 
 from django.views import View
 from django.views.generic import CreateView, ListView, DetailView
+
 
 from .forms import *
 from .models import Card, CardFace, CardOwnership, CardPrice
@@ -89,37 +92,51 @@ class CardDetailView(DetailView):
         result['price_data'] = usd_card_price_chart_data(result['card'].name)
 
         # General Library Details
-        ownership_objs = CardOwnership.objects.filter(user=self.request.user, card__id=result['card'].id)
-        if ownership_objs:
-            lib_details = {
-                'count': ownership_objs.count(),
-                'avg_purchase': sum(CardOwnership.objects.filter(
-                    user=self.request.user,
-                    card__id=result['card'].id).values_list('price_purchased', flat=True)) / ownership_objs.count()
-            }
-            result['library_details'] = lib_details
+        if self.request.user.is_authenticated:
+            ownership_objs = CardOwnership.objects.filter(user=self.request.user, card__id=result['card'].id)
+            if ownership_objs:
+                lib_details = {
+                    'count': ownership_objs.count(),
+                    'avg_purchase': sum(CardOwnership.objects.filter(
+                        user=self.request.user,
+                        card__id=result['card'].id).values_list('price_purchased', flat=True)) / ownership_objs.count()
+                }
+                result['library_details'] = lib_details
 
         return result
 
 
 def usd_card_price_chart_data(card_name):
+    def _price_obj(set_name:str, prices:list[float]):
+        return {
+            'label': set_name,
+            'data': prices
+        }
+
     price_data = CardPrice.objects.filter(card__name=card_name).values(
         'date',
         'price_usd',
         'card_id',
         set_name=F('card__card_set__name')
     ).order_by('date')
+    # all_dates = set(price_data.values_list('date', flat=True)
+    # all_printings_set = set(price_data.values_list('set_name', flat=True))
+    # dates_to_printings_array = np.array(dtype=float, )
+
+    # Note this assumes we have one price history for each day and that all printings have the same
+    printing_to_price_details = {}
+    for data in price_data:
+        try:
+            printing_to_price_details[data['set_name']].append(float(data.get('price_usd') or 0))
+        except KeyError:
+            printing_to_price_details[data['set_name']] = [float(data.get('price_usd') or 0)]
 
     labels = [str(d) for d in price_data.values_list('date', flat=True)]
-    prices = [float(price or 0) for price in price_data.values_list('price_usd', flat=True)]
+    datasets = [_price_obj(card_set, prices) for card_set, prices in printing_to_price_details.items()]
+    # prices = [float(price or 0) for price in price_data.values_list('price_usd', flat=True)]
     data = {
         'labels': labels,
-        'datasets': [
-            {
-                'label': 'Price USD',
-                'data': prices
-            }
-        ]
+        'datasets': datasets
     }
 
     return json.loads(json.dumps(data))
