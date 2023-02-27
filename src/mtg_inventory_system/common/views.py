@@ -1,24 +1,16 @@
 import json
 import logging
-# import numpy as np
-import time
-from collections import defaultdict
+from collections import OrderedDict
 
-from django.contrib.auth.models import User
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.core.paginator import Paginator
 
-from django.db.models import F, Q, Value, URLField, Subquery, OuterRef, Count
+from django.db.models import F, Q, Subquery, OuterRef
 from django.shortcuts import render, redirect
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
-from django.template import loader
-from django.urls import reverse
-from urllib.parse import urlencode
+from django.http import HttpResponse, HttpResponseRedirect
 
 from django.views import View
-from django.views.generic import CreateView, ListView, DetailView
-
+from django.views.generic import ListView, DetailView
 
 from .forms import *
 from .models import Card, CardFace, CardOwnership, CardPrice
@@ -28,10 +20,10 @@ logger = logging.getLogger(__name__)
 
 class AuthViewMixin(View):
     def dispatch(self, request, *args, **kwargs):
-        response = super(AuthViewMixin, self).dispatch(request, *args, **kwargs)
-
         if not request.user.is_authenticated:
             response = redirect('{}?next={}'.format(settings.LOGIN_URL, request.path))
+        else:
+            response = super(AuthViewMixin, self).dispatch(request, *args, **kwargs)
 
         return response
 
@@ -113,6 +105,16 @@ def usd_card_price_chart_data(card_name):
             'data': prices
         }
 
+    def _printing_to_date_obj(dates, printings):
+        mapping_obj = OrderedDict()
+        for printing in printings:
+            mapping_obj[printing] = {}
+            for date in dates:
+                mapping_obj[printing][date] = 0
+
+        return mapping_obj
+
+
     price_data = CardPrice.objects.filter(card__name=card_name).values(
         'date',
         'price_usd',
@@ -120,20 +122,18 @@ def usd_card_price_chart_data(card_name):
         set_name=F('card__card_set__name'),
         collector_number=F('card__collector_number'),
     ).order_by('date')
-    # all_dates = set(price_data.values_list('date', flat=True)
-    # all_printings_set = set(price_data.values_list('set_name', flat=True))
-    # dates_to_printings_array = np.array(dtype=float, )
+
+    all_dates_set = set(price_data.values_list('date', flat=True))
+    all_printings_set = {"{} #{}".format(obj['set_name'], obj['collector_number']) for obj in price_data}
+
+    printings_to_dates = _printing_to_date_obj(all_dates_set, all_printings_set)
 
     # Note this assumes we have one price history for each day and that all printings have the same
-    printing_to_price_details = {}
     for data in price_data:
-        try:
-            printing_to_price_details[f'{data["set_name"]} #{data["collector_number"]}'].append(float(data.get('price_usd') or 0))
-        except KeyError:
-            printing_to_price_details[f'{data["set_name"]} #{data["collector_number"]}'] = [float(data.get('price_usd') or 0)]
+        printings_to_dates[f'{data["set_name"]} #{data["collector_number"]}'][data["date"]] = float(data.get('price_usd') or 0)
 
-    labels = [str(d) for d in price_data.values_list('date', flat=True)]
-    datasets = [_price_obj(card_set, prices) for card_set, prices in printing_to_price_details.items()]
+    labels = [str(d) for d in all_dates_set]
+    datasets = [_price_obj(card_set, list(prices.values())) for card_set, prices in printings_to_dates.items()]
     # prices = [float(price or 0) for price in price_data.values_list('price_usd', flat=True)]
     data = {
         'labels': labels,
@@ -170,8 +170,7 @@ class LibraryCardsListView(CardsListView, AuthViewMixin):
 
     def get_queryset(self):
         result = super(LibraryCardsListView, self).get_queryset().filter(cardownership__user=self.request.user)
-        aggregated_results = result.annotate(id_count=Count('id'))
-        return aggregated_results
+        return result
 
 
 def add_to_library_form(req, card_uuid):
