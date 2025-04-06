@@ -5,20 +5,15 @@ import numpy as np
 import cv2
 from flask import Flask, request, render_template, redirect, url_for, flash
 
-# Import your modified detector class
-from magic_card_detector import MagicCardDetector # Assuming your file is magic_card_detector.py
+from magic_card_detector import MagicCardDetector
 
 # --- Configuration ---
-UPLOAD_FOLDER = 'uploads' # Optional: If you need to save files temporarily
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-REFERENCE_HASH_FILE = 'alpha_reference_phash.dat' # IMPORTANT: Make sure this path is correct
+REFERENCE_HASH_FILE = 'alpha_reference_phash.dat'
 
 # --- Flask App Initialization ---
 app = Flask(__name__)
-app.secret_key = 'your secret key here' # Important for flashing messages
-# app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
-# if not os.path.exists(UPLOAD_FOLDER):
-#     os.makedirs(UPLOAD_FOLDER)
+app.secret_key = 'your secret key here' # TBD
 
 # --- Load MagicCardDetector ONCE ---
 print("Initializing Magic Card Detector...")
@@ -29,7 +24,6 @@ try:
 except FileNotFoundError:
     print(f"ERROR: Reference hash file '{REFERENCE_HASH_FILE}' not found!")
     print("The detector will not be able to recognize cards.")
-    # You might want to exit or handle this more gracefully
     detector = None # Disable detector if reference data fails
 except Exception as e:
     print(f"ERROR loading reference data: {e}")
