@@ -19,6 +19,8 @@ This project provides a solution for automatically detecting and recognizing Mag
    pip install -r requirements.txt
    ```
 
+As of April 2025, the dependencies and their versions have been confirmed for Python 3.13.2.
+
 ## Usage
 
 ### Command Line Interface (CLI)
