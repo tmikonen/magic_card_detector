@@ -1,8 +1,14 @@
+blinker==1.9.0
+click==8.1.8
 contourpy==1.3.1
 cycler==0.12.1
+Flask==3.1.0
 fonttools==4.57.0
 ImageHash==4.3.2
+itsdangerous==2.2.0
+Jinja2==3.1.6
 kiwisolver==1.4.8
+MarkupSafe==3.0.2
 matplotlib==3.10.1
 numpy==2.2.4
 opencv-python==4.11.0.86
@@ -14,3 +20,4 @@ PyWavelets==1.8.0
 scipy==1.15.2
 shapely==2.1.0
 six==1.17.0
+Werkzeug==3.1.3

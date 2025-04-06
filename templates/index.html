@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light"> <!-- data-theme can be light or dark -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Card Detector</title>
+    <!-- Pico.css CDN Link -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+    <!-- Custom Styles -->
+    <style>
+        body {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        main.container {
+            max-width: 768px; /* Limit width for better readability */
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+        }
+        form {
+            margin-top: 2rem;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            border: 1px solid var(--pico-card-border-color);
+            border-radius: var(--pico-card-border-radius);
+            background-color: var(--pico-card-background-color);
+            box-shadow: var(--pico-card-box-shadow);
+        }
+        /* Style file input button */
+        input[type="file"] {
+            border: none; /* Pico adds a border we might not want */
+        }
+        input[type="file"]::file-selector-button {
+            /* Inherit button styles from Pico */
+            background-color: var(--pico-primary);
+            border: 1px solid var(--pico-primary);
+            border-radius: var(--pico-border-radius);
+            color: var(--pico-primary-inverse);
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            transition: background-color var(--pico-transition), border-color var(--pico-transition), color var(--pico-transition), box-shadow var(--pico-transition);
+            margin-right: 1rem; /* Space between button and text */
+        }
+        input[type="file"]::file-selector-button:hover {
+             background-color: var(--pico-primary-hover);
+             border-color: var(--pico-primary-hover);
+        }
+        /* Centered Loader */
+        .loader {
+            display: none; /* Hidden by default */
+            margin: 3rem auto; /* More space */
+            width: 50px;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            border: 8px solid var(--pico-secondary-background);
+            border-right-color: var(--pico-primary); /* Use Pico primary color */
+            animation: spin 1s infinite linear;
+        }
+        @keyframes spin {
+            to { transform: rotate(1turn); }
+        }
+        /* Error message styling */
+        .error-message {
+            color: var(--pico-color-red); /* Pico variable for red */
+            background-color: var(--pico-background-red); /* Pico variable for light red background */
+            border: 1px solid var(--pico-border-red); /* Pico variable for red border */
+            padding: 1rem;
+            border-radius: var(--pico-border-radius);
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header>
+            <h1>Upload Image for MTG Card Detection</h1>
+            <p style="text-align: center;">Upload an image containing Magic: The Gathering cards, and the service will attempt to identify them.</p>
+        </header>
+
+        {% if error %}
+            <!-- Use Pico's article element for alerts/errors -->
+            <article class="error-message" aria-invalid="true">
+                <strong>Error:</strong> {{ error }}
+            </article>
+        {% endif %}
+
+        <form method="post" action="/upload" enctype="multipart/form-data" id="upload-form">
+            <label for="image_file">
+                Choose Image File
+                <input type="file" id="image_file" name="image_file" accept="image/jpeg, image/png, image/jpg" required>
+            </label>
+            <button type="submit" aria-busy="false">Upload and Detect</button>
+        </form>
+
+        <!-- Loading Spinner -->
+        <div id="loading-spinner" class="loader" aria-label="Loading"></div>
+
+    </main> <!-- ./container -->
+
+    <script>
+        const uploadForm = document.getElementById('upload-form');
+        const submitButton = uploadForm.querySelector('button[type="submit"]');
+        const loadingSpinner = document.getElementById('loading-spinner');
+
+        uploadForm.addEventListener('submit', function(event) {
+            // Prevent double submissions
+            if (submitButton.getAttribute('aria-busy') === 'true') {
+                event.preventDefault();
+                return;
+            }
+            // Show loading state
+            loadingSpinner.style.display = 'block';
+            submitButton.setAttribute('aria-busy', 'true');
+            submitButton.textContent = 'Processing...'; // Change button text
+        });
+
+        // Optional: Reset button state if user navigates back
+        window.addEventListener('pageshow', function(event) {
+             if (event.persisted) { // Check if page was loaded from cache
+                loadingSpinner.style.display = 'none';
+                submitButton.setAttribute('aria-busy', 'false');
+                submitButton.textContent = 'Upload and Detect';
+                // Reset file input if possible (browser security often prevents this)
+                // uploadForm.reset();
+             }
+        });
+    </script>
+</body>
+</html>

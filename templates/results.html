@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light"> <!-- Match theme with index.html -->
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MTG Detection Results</title>
+    <!-- Pico.css CDN Link -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+     <!-- Custom Styles -->
+    <style>
+        body {
+            padding-top: 2rem;
+            padding-bottom: 2rem;
+        }
+        main.container {
+            max-width: 1100px; /* Wider container for side-by-side images */
+        }
+         h1 {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        /* Use Pico's grid for layout */
+        .grid > article {
+             padding: 1rem; /* Add padding inside the articles */
+             text-align: center;
+        }
+        .grid img {
+            max-width: 100%;
+            height: auto;
+            max-height: 70vh; /* Limit image height */
+            display: block;
+            margin: 1rem auto; /* Center images and add space */
+            border: 1px solid var(--pico-card-border-color);
+            border-radius: var(--pico-border-radius);
+            box-shadow: var(--pico-card-box-shadow);
+        }
+        h2 {
+             margin-bottom: 0.5rem; /* Space below image titles */
+        }
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <h1>Detection Results</h1>
+
+        <!-- Pico Grid for side-by-side layout -->
+        <div class="grid">
+            <!-- Column 1: Original Image -->
+            <article>
+                <h2>Original Image</h2>
+                {% if original_image_b64 %}
+                    <img src="data:image/png;base64,{{ original_image_b64 }}" alt="Original Uploaded Image">
+                {% else %}
+                    <p>Could not display original image.</p>
+                {% endif %}
+            </article>
+
+            <!-- Column 2: Detected Cards -->
+            <article>
+                <h2>Detected Cards</h2>
+                 {% if result_image_b64 %}
+                    <img src="data:image/png;base64,{{ result_image_b64 }}" alt="Image with Detected Cards">
+                {% else %}
+                    <p>Could not generate result image or no cards detected.</p>
+                {% endif %}
+            </article>
+        </div> <!-- ./grid -->
+
+        <footer>
+            <!-- Style link as a secondary button -->
+            <a href="/" role="button" class="secondary outline">Upload Another Image</a>
+        </footer>
+
+    </main> <!-- ./container -->
+</body>
+</html>

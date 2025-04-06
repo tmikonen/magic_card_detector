@@ -9,6 +9,7 @@ import os
 import cProfile
 import pstats
 import io
+import base64
 import pickle
 import argparse
 from copy import deepcopy
@@ -16,6 +17,8 @@ from itertools import product
 from dataclasses import dataclass
 
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from shapely.geometry import LineString
@@ -495,7 +498,7 @@ class TestImage:
                         else:
                             candidate.is_fragment = True
 
-    def plot_image_with_recognized(self, output_path, visual=False):
+    def plot_image_with_recognized(self, output_path=None, visual=False):
         """
         Plots the recognized cards into the full image.
         """
@@ -529,11 +532,22 @@ class TestImage:
                          bbox=dict(facecolor=bbox_color,
                                    alpha=0.7))
 
-        plt.savefig(output_path + '/MTG_card_recognition_results_' +
-                    str(self.name.split('.jpg')[0]) +
-                    '.jpg', dpi=600)
+        if output_path is not None:
+            plt.savefig(output_path + '/MTG_card_recognition_results_' +
+                        str(self.name.split('.jpg')[0]) +
+                        '.jpg', dpi=600)
         if visual:
             plt.show()
+
+        # Save figure to a bytes buffer
+        buf = io.BytesIO()
+        # Save as PNG for transparency support if needed, or JPG for size
+        plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
+        plt.close() # Close the plot figure to free memory
+        buf.seek(0)
+        img_bytes = buf.getvalue()
+        buf.close()
+        return img_bytes
 
     def print_recognized(self):
         """
@@ -587,11 +601,14 @@ class MagicCardDetector:
     """
     MTG card detector class.
     """
-
-    def __init__(self, output_path):
+    def __init__(self, output_path=None):
+        """
+        Initialize the detector.
+        output_path: Optional path for saving results (used in CLI mode).
+        """
+        self.output_path = output_path  # Store it (will be None if not provided by Flask)
         self.reference_images = []
         self.test_images = []
-        self.output_path = output_path
 
         self.verbose = False
         self.visual = False
@@ -878,6 +895,57 @@ class MagicCardDetector:
             print('Done.')
             test_image.print_recognized()
         print('Recognition done.')
+
+    def process_image_data(self, image_cv2, image_name="uploaded_image"):
+        """
+        Processes a single OpenCV image (NumPy array) passed from the web service.
+        Creates a temporary TestImage, processes it using the internal method,
+        and returns tuple: (original_image_bytes, annotated_image_bytes).
+        Does NOT use self.output_path.
+        """
+        print(f"\n--- Processing Web Request Image: {image_name} ---")
+        if image_cv2 is None:
+            print("Error: Received None for image data in process_image_data.")
+            return None, None
+
+        # --- Prepare Temporary TestImage ---
+        # Resize if needed
+        maxsize = 1000
+        img_h, img_w = image_cv2.shape[:2]
+        if min(img_h, img_w) > maxsize:
+            scalef = maxsize / min(img_h, img_w)
+            print(f"  Resizing image from {img_w}x{img_h} with scale factor {scalef:.2f}")
+            image_cv2 = cv2.resize(image_cv2,
+                                (int(img_w * scalef), int(img_h * scalef)),
+                                interpolation=cv2.INTER_AREA)
+
+        # Create a temporary TestImage object JUST for this request
+        # Use verbose/visual settings from the detector instance (usually False for web)
+        temp_test_image = TestImage(image_name, image_cv2, self.clahe)
+        temp_test_image.visual = False # For consistency, though not used for web output
+
+        alg_list = ['adaptive', 'rgb']
+
+        for alg in alg_list:
+            self.recognize_cards_in_image(temp_test_image, alg)
+            temp_test_image.discard_unrecognized_candidates()
+            if (not temp_test_image.may_contain_more_cards() or
+                    len(temp_test_image.return_recognized()) > 5):
+                break
+
+        # === Handle Web Output ===
+        print(f'Web Output: Generating image bytes for {image_name}...')
+        # Generate annotated image BYTES
+        annotated_image_bytes = temp_test_image.plot_image_with_recognized()
+
+        # Encode original image to BYTES
+        is_success, buffer = cv2.imencode(".png", temp_test_image.original) # Encode as PNG
+        original_image_bytes = buffer.tobytes() if is_success else None
+        if not is_success:
+            print(f"  Error encoding original image '{image_name}' to bytes!")
+
+        print(f"Web Output: Finished processing '{image_name}'. Returning image bytes.")
+        return original_image_bytes, annotated_image_bytes
 
     def recognize_cards_in_image(self, test_image, contouring_mode):
         """
