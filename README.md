@@ -64,7 +64,6 @@ To use the web application, you need to run the Flask app first.
 ├── .pylintrc
 ├── alpha_reference_phash.dat
 ├── app.py
-
 ├── example/
 │   ├── alpha_deck.jpg
 │   ├── black.jpg
@@ -88,7 +87,7 @@ To use the web application, you need to run the Flask app first.
 │   ├── MTG_card_recognition_results_lands_and_fatties.jpg
 │   └── MTG_card_recognition_results_ruby.jpg
 ├── save_hash.py
-└── templates/                # HTML templates for the Flask app
+└── templates/
     ├── index.html
     └── results.html
 ```
@@ -97,7 +96,6 @@ To use the web application, you need to run the Flask app first.
 * `save_hash.py`: Script for precalculating and saving image hashes.
 * `app.py`: Flask application for the web interface.
 * `templates/`: Contains HTML templates for the web application.
-* `doc/`: Contains documentation files.
 * `example/`: Contains example images for testing.
 * `results/`:  Expected results from running the script on the example images.
 * `alpha_reference_phash.dat`: Hash data for Limited Edition Alpha cards.
