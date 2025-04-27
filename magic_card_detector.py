@@ -15,11 +15,14 @@ import argparse
 from copy import deepcopy
 from itertools import product
 from dataclasses import dataclass
+from tqdm import tqdm
+import gc
 
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+plt.switch_backend('Qt5Agg')
 
 from shapely.geometry import LineString
 from shapely.geometry.polygon import Polygon
@@ -411,7 +414,7 @@ class ReferenceImage:
     Container for a card image and the associated recoginition data.
     """
 
-    def __init__(self, name, original_image, clahe, phash=None):
+    def __init__(self, name, original_image, clahe, phash=None, delete_reference=False):
         self.name = name
         self.original = original_image
         self.clahe = clahe
@@ -421,6 +424,12 @@ class ReferenceImage:
         if self.original is not None:
             self.histogram_adjust()
             self.calculate_phash()
+
+        if delete_reference:
+            self.original = None
+            self.adjusted = None
+            del original_image
+            gc.collect()
 
     def calculate_phash(self):
         """
@@ -651,14 +660,19 @@ class MagicCardDetector:
         Reads and histogram-adjusts the reference image set.
         Pre-calculates the hashes of the images.
         """
+
         print('Reading images from ' + str(path))
         print('...', end=' ')
         filenames = glob.glob(path + '*.jpg')
-        for filename in filenames:
+
+        fixed_width = 30
+
+        for filename in tqdm(filenames):
+    
             img = cv2.imread(filename)
-            img_name = filename.split(path)[1]
+            img_name = os.path.basename(filename)
             self.reference_images.append(
-                ReferenceImage(img_name, img, self.clahe))
+                ReferenceImage(img_name, img, self.clahe, delete_reference=True))
         print('Done.')
 
     def read_and_adjust_test_images(self, path):
@@ -945,7 +959,13 @@ class MagicCardDetector:
             print(f"  Error encoding original image '{image_name}' to bytes!")
 
         print(f"Web Output: Finished processing '{image_name}'. Returning image bytes.")
-        return original_image_bytes, annotated_image_bytes
+
+        for candidate in temp_test_image.candidate_list:
+            if not candidate.is_fragment:
+                print(candidate.name)
+        name = "".join((x.name for x in temp_test_image.candidate_list if not x.is_fragment))
+
+        return original_image_bytes, annotated_image_bytes, name
 
     def recognize_cards_in_image(self, test_image, contouring_mode):
         """
@@ -964,26 +984,30 @@ class MagicCardDetector:
         print('Recognizing candidates.')
 
         for i_cand, candidate in enumerate(test_image.candidate_list):
-            im_seg = candidate.image
-            if self.verbose:
-                print(str(i_cand + 1) + " / " +
-                      str(len(test_image.candidate_list)))
+            try:
+                im_seg = candidate.image
+                if self.verbose:
+                    print(str(i_cand + 1) + " / " +
+                        str(len(test_image.candidate_list)))
 
-            # Easy fragment / duplicate detection
-            for other_candidate in test_image.candidate_list:
-                if (other_candidate.is_recognized and
-                        not other_candidate.is_fragment):
-                    if other_candidate.contains(candidate):
-                        candidate.is_fragment = True
-            if not candidate.is_fragment:
-                (candidate.is_recognized,
-                 candidate.recognition_score,
-                 candidate.name) = self.recognize_segment(im_seg)
+                # Easy fragment / duplicate detection
+                for other_candidate in test_image.candidate_list:
+                    if (other_candidate.is_recognized and
+                            not other_candidate.is_fragment):
+                        if other_candidate.contains(candidate):
+                            candidate.is_fragment = True
+                if not candidate.is_fragment:
+                    (candidate.is_recognized,
+                    candidate.recognition_score,
+                    candidate.name) = self.recognize_segment(im_seg)
+            except ValueError:
+                pass
+
 
         print('Done. Found ' +
               str(len(test_image.return_recognized())) +
               ' cards.')
-        if self.verbose:
+        if self.verbose or True:
             for card in test_image.return_recognized():
                 print(card.name + '; S = ' + str(card.recognition_score))
         print('Removing duplicates...')
