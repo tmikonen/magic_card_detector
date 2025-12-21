@@ -9,7 +9,6 @@ import os
 import cProfile
 import pstats
 import io
-import base64
 import pickle
 import argparse
 from copy import deepcopy
@@ -388,15 +387,6 @@ class CardCandidate:
     is_fragment: bool = False
     name: str = 'unknown'
 
-    # def __init__(self, im_seg, bquad, fraction):
-    #    self.image = im_seg
-    #    self.bounding_quad = bquad
-    #    self.is_recognized = False
-    #    self.recognition_score = 0.
-    #    self.is_fragment = False
-    #    self.image_area_fraction = fraction
-    #    self.name = 'unknown'
-
     def contains(self, other):
         """
         Returns whether the bounding polygon of the card candidate
@@ -612,9 +602,8 @@ class MagicCardDetector:
 
         self.verbose = False
         self.visual = False
-
+        
         self.hash_separation_thr = 4.
-        self.thr_lvl = 70
 
         self.clahe = cv2.createCLAHE(clipLimit=2.0,
                                      tileGridSize=(8, 8))
@@ -646,20 +635,33 @@ class MagicCardDetector:
                 ReferenceImage(ref_im.name, None, self.clahe, ref_im.phash))
         print('Done.')
 
-    def read_and_adjust_reference_images(self, path):
+    def calculate_reference_hashes(self, path):
         """
         Reads and histogram-adjusts the reference image set.
         Pre-calculates the hashes of the images.
+        Returns the hash list.
         """
         print('Reading images from ' + str(path))
-        print('...', end=' ')
-        filenames = glob.glob(path + '*.jpg')
+        filenames = glob.glob(os.path.join(path, '*.jpg'))
+        print('Found ' + str(len(filenames)) + ' reference images.')
+
+        hlist=[]
         for filename in filenames:
-            img = cv2.imread(filename)
-            img_name = filename.split(path)[1]
-            self.reference_images.append(
-                ReferenceImage(img_name, img, self.clahe))
+            try:
+                img = cv2.imread(filename)
+                img_name = os.path.basename(filename)
+                image = ReferenceImage(img_name, img, self.clahe)
+                if image.phash is None:
+                    raise ValueError('Hash calculation failed.')
+                image.original = None
+                image.clahe = None
+                image.adjusted = None
+                hlist.append(image)
+            except Exception as e:
+                print('Error processing image ' + str(img_name) +
+                      ': ' + str(e))
         print('Done.')
+        return hlist
 
     def read_and_adjust_test_images(self, path):
         """
@@ -667,8 +669,8 @@ class MagicCardDetector:
         """
         maxsize = 1000
         print('Reading images from ' + str(path))
-        print('...', end=' ')
-        filenames = glob.glob(path.rstrip('/') + '/*.jpg')
+        filenames = glob.glob(os.path.join(path, '*.jpg'))
+        print('Found ' + str(len(filenames)) + ' test images.')
         for filename in filenames:
             img = cv2.imread(filename)
             if min(img.shape[0], img.shape[1]) > maxsize:
@@ -1007,7 +1009,7 @@ def main():
                         help='path containing the images to be analyzed')
     parser.add_argument('output_path',
                         help='output path for the results')
-    parser.add_argument('--phash', default='alpha_reference_phash.dat',
+    parser.add_argument('--phash', default='phash_data/alpha_reference_phash.dat',
                         help='pre-calculated phash reference file')
     parser.add_argument('--visual', default=False, action='store_true',
                         help='run with visualization')
@@ -1029,8 +1031,6 @@ def main():
     card_detector.verbose = args.verbose
 
     # Read the reference and test data sets
-    # card_detector.read_and_adjust_reference_images(
-    #     '../../MTG/Card_Images/LEA/')
     card_detector.read_prehashed_reference_data(args.phash)
     card_detector.read_and_adjust_test_images(args.input_path)
 

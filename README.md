@@ -14,12 +14,26 @@ This project provides a solution for automatically detecting and recognizing Mag
    cd magic_card_detector
    ```
 
-2. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+2. Create and activate a virtual environment (recommended):
 
-As of April 2025, the dependencies and their versions have been confirmed for Python 3.13.2.
+- Linux / macOS:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate
+    ```
+
+- Windows:
+    ```cmd
+    python -m venv venv
+    venv\Scripts\activate.bat
+    ```
+
+3. Install the required dependencies:
+     ```bash
+     pip install -r requirements.txt
+     ```
+
+As of December 2025, the dependencies and their versions have been confirmed for Python 3.13.2 on macOS.
 
 ## Usage
 
@@ -62,34 +76,24 @@ To use the web application, you need to run the Flask app first.
 .
 ├── .gitignore
 ├── .pylintrc
-├── alpha_reference_phash.dat
-├── app.py
 ├── example/
-│   ├── alpha_deck.jpg
-│   ├── black.jpg
-│   ├── counterspell_bgs.jpg
-│   ├── dragon_whelp.jpg
-│   ├── geyser_twister_fireball.jpg
-│   ├── instill_energy.jpg
-│   ├── lands_and_fatties.jpg
-│   └── ruby.jpg
+│   └── *.jpg
+├── phash_data/
+│   └── alpha_reference_phash.dat
+├── reference_card_images/LEA/
+│   └── *.jpg
+├── results/
+│   └── MTG_card_recognition_results_*.jpg
+├── save_hash.py
+├── templates/
+│   ├── index.html
+│   └── results.html
+├── app.py
 ├── LICENSE
 ├── magic_card_detector.py
 ├── README.md
 ├── requirements.txt
-├── results/
-│   ├── MTG_card_recognition_results_alpha_deck.jpg
-│   ├── MTG_card_recognition_results_black.jpg
-│   ├── MTG_card_recognition_results_counterspell_bgs.jpg
-│   ├── MTG_card_recognition_results_dragon_whelp.jpg
-│   ├── MTG_card_recognition_results_geyser_twister_fireball.jpg
-│   ├── MTG_card_recognition_results_instill_energy.jpg
-│   ├── MTG_card_recognition_results_lands_and_fatties.jpg
-│   └── MTG_card_recognition_results_ruby.jpg
-├── save_hash.py
-└── templates/
-    ├── index.html
-    └── results.html
+└── save_hash.py
 ```
 
 * `magic_card_detector.py`: Main script for card detection and recognition (CLI).
@@ -97,8 +101,10 @@ To use the web application, you need to run the Flask app first.
 * `app.py`: Flask application for the web interface.
 * `templates/`: Contains HTML templates for the web application.
 * `example/`: Contains example images for testing.
+* `phash_data/alpha_reference_phash.dat`: Hash data for Limited Edition Alpha cards.
+* `phash_data/9394_reference_phash.dat`: Hash data for cards legal in the Swedish 93/94 Old School format.
+* `reference_card_images/LEA/`:  Reference card images for all Limited Edition Alpha cards.
 * `results/`:  Expected results from running the script on the example images.
-* `alpha_reference_phash.dat`: Hash data for Limited Edition Alpha cards.
 * `requirements.txt`: Lists the Python dependencies.
 * `README.md`: This file, providing project information.
 * `LICENSE`: License file.
