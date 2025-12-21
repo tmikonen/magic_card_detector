@@ -14,12 +14,26 @@ This project provides a solution for automatically detecting and recognizing Mag
    cd magic_card_detector
    ```
 
-2. Install the required dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+2. Create and activate a virtual environment (recommended):
 
-As of April 2025, the dependencies and their versions have been confirmed for Python 3.13.2.
+- Linux / macOS:
+    ```bash
+    python -m venv venv
+    source venv/bin/activate
+    ```
+
+- Windows:
+    ```cmd
+    python -m venv venv
+    venv\Scripts\activate.bat
+    ```
+
+3. Install the required dependencies:
+     ```bash
+     pip install -r requirements.txt
+     ```
+
+As of December 2025, the dependencies and their versions have been confirmed for Python 3.13.2 on macOS.
 
 ## Usage
 
