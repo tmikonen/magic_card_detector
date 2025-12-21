@@ -7,7 +7,7 @@ from magic_card_detector import MagicCardDetector
 
 # --- Configuration ---
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
-REFERENCE_HASH_FILE = 'phash_data/alpha_reference_phash.dat'
+REFERENCE_HASH_FILE = 'phash_data/9394_reference_phash.dat'
 
 # --- Flask App Initialization ---
 app = Flask(__name__)

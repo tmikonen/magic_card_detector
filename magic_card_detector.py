@@ -635,20 +635,33 @@ class MagicCardDetector:
                 ReferenceImage(ref_im.name, None, self.clahe, ref_im.phash))
         print('Done.')
 
-    def read_and_adjust_reference_images(self, path):
+    def calculate_reference_hashes(self, path):
         """
         Reads and histogram-adjusts the reference image set.
         Pre-calculates the hashes of the images.
+        Returns the hash list.
         """
         print('Reading images from ' + str(path))
         filenames = glob.glob(os.path.join(path, '*.jpg'))
         print('Found ' + str(len(filenames)) + ' reference images.')
+
+        hlist=[]
         for filename in filenames:
-            img = cv2.imread(filename)
-            img_name = os.path.basename(filename)
-            self.reference_images.append(
-                ReferenceImage(img_name, img, self.clahe))
+            try:
+                img = cv2.imread(filename)
+                img_name = os.path.basename(filename)
+                image = ReferenceImage(img_name, img, self.clahe)
+                if image.phash is None:
+                    raise ValueError('Hash calculation failed.')
+                image.original = None
+                image.clahe = None
+                image.adjusted = None
+                hlist.append(image)
+            except Exception as e:
+                print('Error processing image ' + str(img_name) +
+                      ': ' + str(e))
         print('Done.')
+        return hlist
 
     def read_and_adjust_test_images(self, path):
         """
