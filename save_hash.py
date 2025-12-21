@@ -26,9 +26,4 @@ try:
         peak_megabytes = peak / (1024 * 1024)
     print(f'Peak memory (high-water mark): {peak_megabytes} MB')
 except Exception:
-    try:
-        import psutil
-        p = psutil.Process()
-        print(f'Current RSS (psutil): {p.memory_info().rss / (1024 * 1024)} MB')
-    except Exception:
-        print('Could not determine peak memory usage: resource and psutil unavailable')
+        print('Could not determine peak memory usage.')
