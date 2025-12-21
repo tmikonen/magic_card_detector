@@ -602,9 +602,8 @@ class MagicCardDetector:
 
         self.verbose = False
         self.visual = False
-
+        
         self.hash_separation_thr = 4.
-        self.thr_lvl = 70
 
         self.clahe = cv2.createCLAHE(clipLimit=2.0,
                                      tileGridSize=(8, 8))
@@ -642,11 +641,11 @@ class MagicCardDetector:
         Pre-calculates the hashes of the images.
         """
         print('Reading images from ' + str(path))
-        print('...', end=' ')
-        filenames = glob.glob(path + '*.jpg')
+        filenames = glob.glob(os.path.join(path, '*.jpg'))
+        print('Found ' + str(len(filenames)) + ' reference images.')
         for filename in filenames:
             img = cv2.imread(filename)
-            img_name = filename.split(path)[1]
+            img_name = os.path.basename(filename)
             self.reference_images.append(
                 ReferenceImage(img_name, img, self.clahe))
         print('Done.')
@@ -657,8 +656,8 @@ class MagicCardDetector:
         """
         maxsize = 1000
         print('Reading images from ' + str(path))
-        print('...', end=' ')
-        filenames = glob.glob(path.rstrip('/') + '/*.jpg')
+        filenames = glob.glob(os.path.join(path, '*.jpg'))
+        print('Found ' + str(len(filenames)) + ' test images.')
         for filename in filenames:
             img = cv2.imread(filename)
             if min(img.shape[0], img.shape[1]) > maxsize:
@@ -997,7 +996,7 @@ def main():
                         help='path containing the images to be analyzed')
     parser.add_argument('output_path',
                         help='output path for the results')
-    parser.add_argument('--phash', default='alpha_reference_phash.dat',
+    parser.add_argument('--phash', default='phash_data/alpha_reference_phash.dat',
                         help='pre-calculated phash reference file')
     parser.add_argument('--visual', default=False, action='store_true',
                         help='run with visualization')
@@ -1019,8 +1018,6 @@ def main():
     card_detector.verbose = args.verbose
 
     # Read the reference and test data sets
-    # card_detector.read_and_adjust_reference_images(
-    #     '../../MTG/Card_Images/LEA/')
     card_detector.read_prehashed_reference_data(args.phash)
     card_detector.read_and_adjust_test_images(args.input_path)
 
