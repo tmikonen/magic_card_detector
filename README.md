@@ -77,37 +77,23 @@ To use the web application, you need to run the Flask app first.
 ├── .gitignore
 ├── .pylintrc
 ├── example/
-│   ├── alpha_deck.jpg
-│   ├── black.jpg
-│   ├── counterspell_bgs.jpg
-│   ├── dragon_whelp.jpg
-│   ├── geyser_twister_fireball.jpg
-│   ├── instill_energy.jpg
-│   ├── lands_and_fatties.jpg
-│   └── ruby.jpg
+│   └── *.jpg
 ├── phash_data/
-│   ├── alpha_reference_phash.dat
+│   └── alpha_reference_phash.dat
 ├── reference_card_images/LEA/
-│   ├── *.jpg
+│   └── *.jpg
 ├── results/
-│   ├── MTG_card_recognition_results_alpha_deck.jpg
-│   ├── MTG_card_recognition_results_black.jpg
-│   ├── MTG_card_recognition_results_counterspell_bgs.jpg
-│   ├── MTG_card_recognition_results_dragon_whelp.jpg
-│   ├── MTG_card_recognition_results_geyser_twister_fireball.jpg
-│   ├── MTG_card_recognition_results_instill_energy.jpg
-│   ├── MTG_card_recognition_results_lands_and_fatties.jpg
-│   └── MTG_card_recognition_results_ruby.jpg
+│   └── MTG_card_recognition_results_*.jpg
 ├── save_hash.py
-└── templates/
-    ├── index.html
-    └── results.html
+├── templates/
+│   ├── index.html
+│   └── results.html
 ├── app.py
 ├── LICENSE
 ├── magic_card_detector.py
 ├── README.md
 ├── requirements.txt
-├── save_hash.py
+└── save_hash.py
 ```
 
 * `magic_card_detector.py`: Main script for card detection and recognition (CLI).
@@ -116,6 +102,7 @@ To use the web application, you need to run the Flask app first.
 * `templates/`: Contains HTML templates for the web application.
 * `example/`: Contains example images for testing.
 * `phash_data/alpha_reference_phash.dat`: Hash data for Limited Edition Alpha cards.
+* `phash_data/9394_reference_phash.dat`: Hash data for cards legal in the Swedish 93/94 Old School format.
 * `reference_card_images/LEA/`:  Reference card images for all Limited Edition Alpha cards.
 * `results/`:  Expected results from running the script on the example images.
 * `requirements.txt`: Lists the Python dependencies.
