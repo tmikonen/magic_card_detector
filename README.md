@@ -62,8 +62,6 @@ To use the web application, you need to run the Flask app first.
 .
 ├── .gitignore
 ├── .pylintrc
-├── alpha_reference_phash.dat
-├── app.py
 ├── example/
 │   ├── alpha_deck.jpg
 │   ├── black.jpg
@@ -73,10 +71,10 @@ To use the web application, you need to run the Flask app first.
 │   ├── instill_energy.jpg
 │   ├── lands_and_fatties.jpg
 │   └── ruby.jpg
-├── LICENSE
-├── magic_card_detector.py
-├── README.md
-├── requirements.txt
+├── phash_data/
+│   ├── alpha_reference_phash.dat
+├── reference_card_images/LEA/
+│   ├── *.jpg
 ├── results/
 │   ├── MTG_card_recognition_results_alpha_deck.jpg
 │   ├── MTG_card_recognition_results_black.jpg
@@ -90,6 +88,12 @@ To use the web application, you need to run the Flask app first.
 └── templates/
     ├── index.html
     └── results.html
+├── app.py
+├── LICENSE
+├── magic_card_detector.py
+├── README.md
+├── requirements.txt
+├── save_hash.py
 ```
 
 * `magic_card_detector.py`: Main script for card detection and recognition (CLI).
@@ -97,8 +101,9 @@ To use the web application, you need to run the Flask app first.
 * `app.py`: Flask application for the web interface.
 * `templates/`: Contains HTML templates for the web application.
 * `example/`: Contains example images for testing.
+* `phash_data/alpha_reference_phash.dat`: Hash data for Limited Edition Alpha cards.
+* `reference_card_images/LEA/`:  Reference card images for all Limited Edition Alpha cards.
 * `results/`:  Expected results from running the script on the example images.
-* `alpha_reference_phash.dat`: Hash data for Limited Edition Alpha cards.
 * `requirements.txt`: Lists the Python dependencies.
 * `README.md`: This file, providing project information.
 * `LICENSE`: License file.
